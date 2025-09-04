@@ -65,18 +65,74 @@ export class DataFetcher {
       // Check the correct structure based on FCDO Content API
       if (data.details) {
         console.log(`[FCDO DEBUG] Found details for ${countryName}, details keys:`, Object.keys(data.details));
+        console.log(`[FCDO DEBUG] Alert status for ${countryName}:`, data.details.alert_status);
         
-        // Extract travel advice information from the content API response
+        // Extract actual travel advisory information
+        let level = "Standard";
+        let severity = "info";
+        let advisoryText = "";
+        
+        // Parse alert_status for actual travel recommendations
+        if (data.details.alert_status && data.details.alert_status.length > 0) {
+          const alertStatus = data.details.alert_status[0];
+          console.log(`[FCDO DEBUG] Alert status details:`, alertStatus);
+          
+          // Alert status is a string, not an object
+          if (typeof alertStatus === 'string') {
+            level = this.formatFCDOAlertLevel(alertStatus);
+            
+            // Map FCDO alert status codes to severity
+            const alertType = alertStatus.toLowerCase();
+            if (alertType.includes('avoid_all_travel') || alertType.includes('do_not_travel')) {
+              severity = "high";
+              advisoryText = "The FCDO advises against all travel to this destination.";
+            } else if (alertType.includes('avoid_all_but_essential_travel')) {
+              severity = "high";
+              advisoryText = "The FCDO advises against all but essential travel to this destination.";
+            } else if (alertType.includes('reconsider_travel') || alertType.includes('exercise_increased_caution')) {
+              severity = "medium";
+              advisoryText = "Exercise increased caution when traveling to this destination.";
+            } else if (alertType.includes('see_our_advice')) {
+              severity = "medium";
+              advisoryText = "Check current FCDO travel advice before traveling.";
+            } else {
+              severity = "low";
+              advisoryText = "Standard travel precautions apply.";
+            }
+          }
+        }
+        
+        // Extract summary from parts if available
+        let summary = data.description || advisoryText || "Current travel advice from UK FCDO";
+        
+        if (data.details.parts && data.details.parts.length > 0) {
+          // Try to find summary or safety information in parts
+          const summaryPart = data.details.parts.find((part: any) => 
+            part.title && (part.title.toLowerCase().includes('summary') || part.title.toLowerCase().includes('latest update'))
+          );
+          
+          if (summaryPart && summaryPart.body) {
+            // Extract first paragraph or sentence from HTML content
+            const bodyText = summaryPart.body.replace(/<[^>]*>/g, '').trim();
+            if (bodyText.length > 0) {
+              summary = bodyText.substring(0, 300) + (bodyText.length > 300 ? '...' : '');
+            }
+          }
+        }
+        
+        // If still no meaningful summary, use the advisory text
+        if (!summary || summary === data.description) {
+          summary = advisoryText || data.description || "Current travel advice available from UK FCDO";
+        }
+        
         const title = data.title || `${countryName} Travel Advice`;
-        const summary = data.description || data.details.summary || "Current travel advice from UK FCDO";
-        const level = "Standard"; // FCDO doesn't use same level system as State Dept
         
         alerts.push({
           countryId: country.id,
           source: "UK FCDO",
           title: title,
           level: level,
-          severity: "medium", // Default to medium for FCDO
+          severity: severity,
           summary: summary,
           link: `https://www.gov.uk/foreign-travel-advice/${urlSlug}`,
           date: new Date(data.updated_at || Date.now()),
@@ -300,9 +356,34 @@ export class DataFetcher {
   private mapFCDOSeverity(alertType: string): string {
     if (!alertType) return "info";
     const type = alertType.toLowerCase();
-    if (type.includes("advise against") || type.includes("essential")) return "high";
-    if (type.includes("see our advice")) return "medium";
+    
+    // High severity - Do not travel
+    if (type.includes("advise against all travel") || type.includes("do not travel")) return "high";
+    
+    // High severity - Essential travel only
+    if (type.includes("advise against all but essential travel") || type.includes("essential travel only")) return "high";
+    
+    // Medium severity - General advisories
+    if (type.includes("see our advice") || type.includes("reconsider travel")) return "medium";
+    
+    // Low severity - Standard precautions
     return "low";
+  }
+
+  private formatFCDOAlertLevel(alertStatus: string): string {
+    // Convert FCDO alert status codes to readable levels
+    switch (alertStatus.toLowerCase()) {
+      case 'avoid_all_travel_to_whole_country':
+        return "Advise against all travel";
+      case 'avoid_all_but_essential_travel_to_whole_country':
+        return "Advise against all but essential travel";
+      case 'avoid_some_areas':
+        return "Advise against travel to parts of the country";
+      case 'see_our_advice':
+        return "See travel advice";
+      default:
+        return alertStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
   }
 
   private getCountryCode(countryName: string): string {
