@@ -22,7 +22,7 @@ export class DataFetcher {
         level: `Level ${advisoryLevel}`,
         severity: this.mapStateDeptSeverity(advisoryLevel),
         summary: `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`,
-        link: `https://travel.state.gov/en/international-travel/travel-advisories/${this.formatUrlSlug(countryName)}.html`,
+        link: `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatUrlSlug(countryName)}-travel-advisory.html`,
         date: new Date(),
       });
 
@@ -39,33 +39,23 @@ export class DataFetcher {
       // Correct FCDO Content API format
       const apiUrl = `https://www.gov.uk/api/content/foreign-travel-advice/${urlSlug}`;
       
-      console.log(`[FCDO DEBUG] Fetching for ${countryName}, URL: ${apiUrl}`);
-      
       // UK FCDO Travel Advice API
       const response = await fetch(apiUrl);
       
-      console.log(`[FCDO DEBUG] Response status: ${response.status}`);
-      
       if (!response.ok) {
-        console.log(`[FCDO DEBUG] Response not OK for ${countryName}: ${response.status} ${response.statusText}`);
         return [];
       }
       
       const data = await response.json();
-      console.log(`[FCDO DEBUG] Raw API data keys for ${countryName}:`, Object.keys(data));
-      console.log(`[FCDO DEBUG] Schema name: ${data.schema_name}, Document type: ${data.document_type}`);
       
       const alerts: InsertAlert[] = [];
       const country = await storage.getCountryByName(countryName);
       if (!country) {
-        console.log(`[FCDO DEBUG] Country not found in storage: ${countryName}`);
         return alerts;
       }
 
       // Check the correct structure based on FCDO Content API
       if (data.details) {
-        console.log(`[FCDO DEBUG] Found details for ${countryName}, details keys:`, Object.keys(data.details));
-        console.log(`[FCDO DEBUG] Alert status for ${countryName}:`, data.details.alert_status);
         
         // Extract actual travel advisory information
         let level = "Standard";
@@ -75,7 +65,6 @@ export class DataFetcher {
         // Parse alert_status for actual travel recommendations
         if (data.details.alert_status && data.details.alert_status.length > 0) {
           const alertStatus = data.details.alert_status[0];
-          console.log(`[FCDO DEBUG] Alert status details:`, alertStatus);
           
           // Alert status is a string, not an object
           if (typeof alertStatus === 'string') {
@@ -137,9 +126,7 @@ export class DataFetcher {
           link: `https://www.gov.uk/foreign-travel-advice/${urlSlug}`,
           date: new Date(data.updated_at || Date.now()),
         });
-        console.log(`[FCDO DEBUG] Created alert for ${countryName}:`, alerts[0]);
       } else {
-        console.log(`[FCDO DEBUG] No details found in API response for ${countryName}. Available keys:`, Object.keys(data));
         
         // Try to create a basic alert even without details
         if (data.title || data.description) {
@@ -153,13 +140,12 @@ export class DataFetcher {
             link: `https://www.gov.uk/foreign-travel-advice/${urlSlug}`,
             date: new Date(data.updated_at || Date.now()),
           });
-          console.log(`[FCDO DEBUG] Created basic alert for ${countryName}:`, alerts[0]);
         }
       }
 
       return alerts;
     } catch (error) {
-      console.error(`[FCDO DEBUG] Error fetching FCDO advisories for ${countryName}:`, error);
+      console.error("Error fetching FCDO advisories:", error);
       return [];
     }
   }
