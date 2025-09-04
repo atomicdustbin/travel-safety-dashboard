@@ -22,7 +22,7 @@ export class DataFetcher {
         level: `Level ${advisoryLevel}`,
         severity: this.mapStateDeptSeverity(advisoryLevel),
         summary: `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`,
-        link: `https://travel.state.gov/content/travel/en/traveladvisories/${this.formatUrlSlug(countryName)}.html`,
+        link: `https://travel.state.gov/en/international-travel/travel-advisories/${this.formatUrlSlug(countryName)}.html`,
         date: new Date(),
       });
 
@@ -81,7 +81,7 @@ export class DataFetcher {
         level: healthConcerns.level,
         severity: healthConcerns.severity,
         summary: healthConcerns.summary,
-        link: `https://wwwnc.cdc.gov/travel/destinations/list/${this.formatUrlSlug(countryName)}`,
+        link: `https://wwwnc.cdc.gov/travel/destinations/traveler/none/${this.formatUrlSlug(countryName)}`,
         date: new Date(),
       });
 
@@ -137,7 +137,7 @@ export class DataFetcher {
         level: "Situation Update",
         severity: "medium",
         summary: `Current ${randomType} situation in ${countryName}. Monitor local conditions and follow guidance from local authorities.`,
-        link: `https://reliefweb.int/country/${this.getCountryCode(countryName).toLowerCase()}`,
+        link: `https://reliefweb.int/country/${this.getCountryCode3Letter(countryName).toLowerCase()}`,
         date: new Date(),
       });
 
@@ -282,6 +282,28 @@ export class DataFetcher {
       "vietnam": "VN", "yemen": "YE", "zimbabwe": "ZW"
     };
     return codes[countryName.toLowerCase()] || "XX";
+  }
+
+  private getCountryCode3Letter(countryName: string): string {
+    const codes: { [key: string]: string } = {
+      "afghanistan": "AFG", "albania": "ALB", "algeria": "DZA", "argentina": "ARG", "australia": "AUS",
+      "austria": "AUT", "bangladesh": "BGD", "belarus": "BLR", "belgium": "BEL", "bolivia": "BOL",
+      "brazil": "BRA", "burkina faso": "BFA", "cambodia": "KHM", "canada": "CAN", "chad": "TCD",
+      "chile": "CHL", "china": "CHN", "colombia": "COL", "costa rica": "CRI", "cuba": "CUB",
+      "denmark": "DNK", "ecuador": "ECU", "egypt": "EGY", "ethiopia": "ETH", "fiji": "FJI",
+      "finland": "FIN", "france": "FRA", "germany": "DEU", "ghana": "GHA", "greece": "GRC",
+      "haiti": "HTI", "india": "IND", "indonesia": "IDN", "iran": "IRN", "iraq": "IRQ",
+      "ireland": "IRL", "israel": "ISR", "italy": "ITA", "jamaica": "JAM", "japan": "JPN",
+      "jordan": "JOR", "kenya": "KEN", "laos": "LAO", "lebanon": "LBN", "libya": "LBY",
+      "mali": "MLI", "mexico": "MEX", "myanmar": "MMR", "nepal": "NPL", "netherlands": "NLD",
+      "new zealand": "NZL", "niger": "NER", "nigeria": "NGA", "north korea": "PRK", "norway": "NOR",
+      "pakistan": "PAK", "papua new guinea": "PNG", "peru": "PER", "philippines": "PHL", "poland": "POL",
+      "portugal": "PRT", "russia": "RUS", "singapore": "SGP", "somalia": "SOM", "south africa": "ZAF",
+      "south korea": "KOR", "spain": "ESP", "sweden": "SWE", "syria": "SYR", "thailand": "THA",
+      "turkey": "TUR", "ukraine": "UKR", "united kingdom": "GBR", "united states": "USA", "venezuela": "VEN",
+      "vietnam": "VNM", "yemen": "YEM", "zimbabwe": "ZWE"
+    };
+    return codes[countryName.toLowerCase()] || "XXX";
   }
 
   private formatUrlSlug(countryName: string): string {
