@@ -184,7 +184,7 @@ export class DataFetcher {
 
       return {
         countryId: country.id,
-        languages: countryData.languages ? Object.values(countryData.languages) : [],
+        languages: countryData.languages ? Object.values(countryData.languages) as string[] : null,
         religion: countryData.religion || "Various",
         gdpPerCapita: null, // Will be filled by World Bank data
         population: countryData.population?.toLocaleString() || "Unknown",

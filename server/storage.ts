@@ -46,6 +46,7 @@ export class MemStorage implements IStorage {
   async createCountry(insertCountry: InsertCountry): Promise<Country> {
     const country: Country = {
       ...insertCountry,
+      flagUrl: insertCountry.flagUrl || null,
       lastUpdated: new Date(),
     };
     this.countries.set(country.id, country);
@@ -71,6 +72,7 @@ export class MemStorage implements IStorage {
     const alert: Alert = {
       ...insertAlert,
       id: randomUUID(),
+      level: insertAlert.level || null,
       createdAt: new Date(),
     };
     this.alerts.set(alert.id, alert);
@@ -100,6 +102,7 @@ export class MemStorage implements IStorage {
       const updated: BackgroundInfo = {
         ...existingInfo,
         ...insertInfo,
+        languages: Array.isArray(insertInfo.languages) ? insertInfo.languages : null,
         lastUpdated: new Date(),
       };
       this.backgroundInfo.set(existingInfo.id, updated);
@@ -108,6 +111,7 @@ export class MemStorage implements IStorage {
       const info: BackgroundInfo = {
         ...insertInfo,
         id: randomUUID(),
+        languages: Array.isArray(insertInfo.languages) ? insertInfo.languages : null,
         lastUpdated: new Date(),
       };
       this.backgroundInfo.set(info.id, info);
@@ -125,7 +129,7 @@ export class MemStorage implements IStorage {
     return {
       country,
       alerts,
-      background,
+      background: background || null,
     };
   }
 

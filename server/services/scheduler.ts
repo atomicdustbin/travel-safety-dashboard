@@ -37,7 +37,7 @@ class DataScheduler {
 
   private async refreshAlerts(): Promise<void> {
     console.log("Refreshing alert data for recent countries...");
-    for (const countryName of this.recentCountries) {
+    for (const countryName of Array.from(this.recentCountries)) {
       try {
         await dataFetcher.fetchAllCountryData(countryName);
       } catch (error) {
@@ -48,7 +48,7 @@ class DataScheduler {
 
   private async refreshBackgroundData(): Promise<void> {
     console.log("Refreshing background data for recent countries...");
-    for (const countryName of this.recentCountries) {
+    for (const countryName of Array.from(this.recentCountries)) {
       try {
         // Only refresh background data, not alerts
         const ciaData = await dataFetcher.fetchCIAFactbook(countryName);

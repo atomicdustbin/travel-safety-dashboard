@@ -12,11 +12,11 @@ export default function Home() {
   const [hasSearched, setHasSearched] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["/api/search", { countries: searchCountries.join(",") }],
+    queryKey: [`/api/search?countries=${encodeURIComponent(searchCountries.join(","))}`],
     enabled: searchCountries.length > 0,
   });
 
-  const searchResults = data?.results as SearchResult || [];
+  const searchResults = ((data as any)?.results as SearchResult) || [];
 
   const handleSearch = (countries: string[]) => {
     setSearchCountries(countries);
