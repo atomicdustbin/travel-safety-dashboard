@@ -18,6 +18,23 @@ export default function Home() {
 
   const searchResults = ((data as any)?.results as SearchResult) || [];
 
+  // Function to extract US State Department threat level from country data
+  const getStateDeptThreatLevel = (countryData: any) => {
+    const stateDeptAlert = countryData.alerts?.find((alert: any) => alert.source === "US State Dept");
+    if (!stateDeptAlert || !stateDeptAlert.level) return 0; // Default to 0 for countries without a level
+    
+    // Extract number from level (e.g., "Level 1" -> 1)
+    const levelMatch = stateDeptAlert.level.match(/Level (\d)/);
+    return levelMatch ? parseInt(levelMatch[1]) : 0;
+  };
+
+  // Sort results by threat level (highest level first)
+  const sortedResults = [...searchResults].sort((a, b) => {
+    const levelA = getStateDeptThreatLevel(a);
+    const levelB = getStateDeptThreatLevel(b);
+    return levelB - levelA; // Sort descending (Level 4 first, then 3, 2, 1)
+  });
+
   const handleSearch = (countries: string[]) => {
     setSearchCountries(countries);
     setHasSearched(true);
@@ -96,7 +113,7 @@ export default function Home() {
         {/* Results */}
         {!isLoading && !error && searchResults.length > 0 && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="search-results">
-            {searchResults.map((countryData) => (
+            {sortedResults.map((countryData) => (
               <CountryCard key={countryData.country.id} countryData={countryData} />
             ))}
           </div>
