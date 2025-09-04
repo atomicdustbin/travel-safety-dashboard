@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, FileText, ExternalLink } from "lucide-react";
+import { AlertTriangle, FileText, ExternalLink, Globe } from "lucide-react";
 import { type CountryData } from "@shared/schema";
+import { useState } from "react";
 
 interface CountryCardProps {
   countryData: CountryData;
@@ -9,6 +10,7 @@ interface CountryCardProps {
 
 export function CountryCard({ countryData }: CountryCardProps) {
   const { country, alerts, background } = countryData;
+  const [flagError, setFlagError] = useState(false);
 
   const getSeverityClass = (severity: string) => {
     switch (severity) {
@@ -48,13 +50,19 @@ export function CountryCard({ countryData }: CountryCardProps) {
             {country.name}
           </h3>
           <div className="flex items-center space-x-2">
-            {country.flagUrl && (
+            {country.flagUrl && !flagError ? (
               <img
                 src={country.flagUrl}
                 alt={`${country.name} flag`}
                 className="w-8 h-6 rounded border"
                 data-testid={`img-flag-${country.id}`}
+                onError={() => setFlagError(true)}
+                onLoad={() => setFlagError(false)}
               />
+            ) : (
+              <div className="w-8 h-6 rounded border bg-muted flex items-center justify-center">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+              </div>
             )}
             <span className="text-sm text-muted-foreground" data-testid={`text-country-code-${country.id}`}>
               {country.code}
