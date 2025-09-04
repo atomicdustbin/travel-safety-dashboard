@@ -12,6 +12,48 @@ export function CountryCard({ countryData }: CountryCardProps) {
   const { country, alerts, background } = countryData;
   const [flagError, setFlagError] = useState(false);
 
+  // Find US State Department alert and extract threat level
+  const getStateDeptThreatLevel = () => {
+    const stateDeptAlert = alerts.find(alert => alert.source === "US State Dept");
+    if (!stateDeptAlert || !stateDeptAlert.level) return null;
+    
+    // Extract number from level (e.g., "Level 1" -> 1)
+    const levelMatch = stateDeptAlert.level.match(/Level (\d)/);
+    return levelMatch ? parseInt(levelMatch[1]) : null;
+  };
+
+  const getThreatLevelColor = (level: number | null) => {
+    switch (level) {
+      case 1:
+        return "bg-green-600"; // Green for Level 1
+      case 2:
+        return "bg-yellow-500"; // Yellow for Level 2
+      case 3:
+        return "bg-orange-500"; // Orange for Level 3
+      case 4:
+        return "bg-red-600"; // Red for Level 4
+      default:
+        return "bg-gray-500"; // Gray if no level found
+    }
+  };
+
+  const getThreatLevelText = (level: number | null) => {
+    switch (level) {
+      case 1:
+        return "Level 1: Exercise Normal Precautions";
+      case 2:
+        return "Level 2: Exercise Increased Caution";
+      case 3:
+        return "Level 3: Reconsider Travel";
+      case 4:
+        return "Level 4: Do Not Travel";
+      default:
+        return "Travel Advisory Level Not Available";
+    }
+  };
+
+  const threatLevel = getStateDeptThreatLevel();
+
   const getSeverityClass = (severity: string) => {
     switch (severity) {
       case "high":
@@ -44,6 +86,16 @@ export function CountryCard({ countryData }: CountryCardProps) {
 
   return (
     <Card className="overflow-hidden shadow-sm hover:shadow-md transition-shadow" data-testid={`card-country-${country.id}`}>
+      {/* US State Department Threat Level Indicator */}
+      <div 
+        className={`${getThreatLevelColor(threatLevel)} px-4 py-3 text-center`}
+        data-testid={`threat-level-${country.id}`}
+      >
+        <div className="text-white font-semibold text-sm">
+          US State Department: {getThreatLevelText(threatLevel)}
+        </div>
+      </div>
+      
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold text-foreground" data-testid={`text-country-name-${country.id}`}>
