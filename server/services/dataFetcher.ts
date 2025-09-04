@@ -22,7 +22,7 @@ export class DataFetcher {
         level: `Level ${advisoryLevel}`,
         severity: this.mapStateDeptSeverity(advisoryLevel),
         summary: `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`,
-        link: `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${countryName.toLowerCase().replace(/\s+/g, '-')}.html`,
+        link: `https://travel.state.gov/content/travel/en/traveladvisories/${this.formatUrlSlug(countryName)}.html`,
         date: new Date(),
       });
 
@@ -36,7 +36,7 @@ export class DataFetcher {
   async fetchFCDOAdvisories(countryName: string): Promise<InsertAlert[]> {
     try {
       // UK FCDO Travel Advice API
-      const response = await fetch(`https://www.gov.uk/api/foreign-travel-advice/${countryName.toLowerCase().replace(/\s+/g, '-')}.json`);
+      const response = await fetch(`https://www.gov.uk/api/foreign-travel-advice/${this.formatUrlSlug(countryName)}.json`);
       
       if (!response.ok) return [];
       
@@ -53,7 +53,7 @@ export class DataFetcher {
           level: data.details.alert_status?.[0]?.alert_type || "Standard",
           severity: this.mapFCDOSeverity(data.details.alert_status?.[0]?.alert_type),
           summary: data.details.summary || "Check current travel advice",
-          link: `https://www.gov.uk/foreign-travel-advice/${countryName.toLowerCase().replace(/\s+/g, '-')}`,
+          link: `https://www.gov.uk/foreign-travel-advice/${this.formatUrlSlug(countryName)}`,
           date: new Date(data.updated_at || Date.now()),
         });
       }
@@ -81,7 +81,7 @@ export class DataFetcher {
         level: healthConcerns.level,
         severity: healthConcerns.severity,
         summary: healthConcerns.summary,
-        link: `https://wwwnc.cdc.gov/travel/destinations/traveler/none/${countryName.toLowerCase().replace(/\s+/g, '-')}`,
+        link: `https://wwwnc.cdc.gov/travel/destinations/list/${this.formatUrlSlug(countryName)}`,
         date: new Date(),
       });
 
@@ -137,7 +137,7 @@ export class DataFetcher {
         level: "Situation Update",
         severity: "medium",
         summary: `Current ${randomType} situation in ${countryName}. Monitor local conditions and follow guidance from local authorities.`,
-        link: `https://reliefweb.int/country/${countryName.toLowerCase().replace(/\s+/g, '-')}`,
+        link: `https://reliefweb.int/country/${this.getCountryCode(countryName).toLowerCase()}`,
         date: new Date(),
       });
 
@@ -168,7 +168,7 @@ export class DataFetcher {
         population: countryData.population?.toLocaleString() || "Unknown",
         capital: countryData.capital?.[0] || "Unknown",
         currency: countryData.currencies ? Object.keys(countryData.currencies)[0] : "Unknown",
-        wikiLink: `https://en.wikivoyage.org/wiki/${countryName.replace(/\s+/g, '_')}`,
+        wikiLink: `https://en.wikivoyage.org/wiki/${encodeURIComponent(countryName.replace(/\s+/g, '_'))}`,
       };
     } catch (error) {
       console.error("Error fetching CIA Factbook data:", error);
@@ -201,7 +201,7 @@ export class DataFetcher {
       let country = await storage.getCountryByName(countryName);
       if (!country) {
         // Create country if it doesn't exist
-        const countryId = countryName.toLowerCase().replace(/\s+/g, '-');
+        const countryId = this.formatUrlSlug(countryName);
         country = await storage.createCountry({
           id: countryId,
           name: countryName,
@@ -282,6 +282,24 @@ export class DataFetcher {
       "vietnam": "VN", "yemen": "YE", "zimbabwe": "ZW"
     };
     return codes[countryName.toLowerCase()] || "XX";
+  }
+
+  private formatUrlSlug(countryName: string): string {
+    // Handle special cases for URL formatting
+    const specialCases: { [key: string]: string } = {
+      "united kingdom": "uk",
+      "united states": "usa",
+      "south korea": "korea-south",
+      "north korea": "korea-north",
+      "new zealand": "new-zealand",
+      "south africa": "south-africa",
+      "costa rica": "costa-rica",
+      "burkina faso": "burkina-faso",
+      "papua new guinea": "papua-new-guinea"
+    };
+    
+    const lowerName = countryName.toLowerCase();
+    return specialCases[lowerName] || lowerName.replace(/\s+/g, '-');
   }
 
   private getDefaultAdvisoryLevel(countryName: string): number {
