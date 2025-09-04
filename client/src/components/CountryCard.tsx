@@ -92,7 +92,7 @@ export function CountryCard({ countryData }: CountryCardProps) {
         data-testid={`threat-level-${country.id}`}
       >
         <div className="text-white font-semibold text-sm">
-          US State Department: {getThreatLevelText(threatLevel)}
+          {getThreatLevelText(threatLevel)}
         </div>
       </div>
       
