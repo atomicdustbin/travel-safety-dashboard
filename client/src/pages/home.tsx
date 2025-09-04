@@ -96,17 +96,47 @@ export default function Home() {
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center" data-testid="error-state">
             <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-destructive mb-2">Unable to Load Data</h3>
-            <p className="text-destructive/80 mb-4" data-testid="text-error-message">
-              Some data sources are currently unavailable. Please try again later.
-            </p>
-            <Button
-              onClick={handleRefresh}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              data-testid="button-retry"
-            >
-              Try Again
-            </Button>
+            {/* Check if this is a country validation error (400 status) */}
+            {(error as any)?.response?.status === 400 ? (
+              <>
+                <h3 className="text-lg font-semibold text-destructive mb-2">Country Not Found</h3>
+                <p className="text-destructive/80 mb-4" data-testid="text-error-message">
+                  Please check the spelling and try again.
+                </p>
+                {/* Show specific error details if available */}
+                {(error as any)?.response?.data?.details && (
+                  <div className="bg-destructive/5 border border-destructive/10 rounded-md p-3 mb-4 text-sm">
+                    <ul className="text-destructive/90 space-y-1">
+                      {(error as any).response.data.details.map((detail: string, index: number) => (
+                        <li key={index}>• {detail}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <Button
+                  onClick={handleRefresh}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  data-testid="button-retry"
+                >
+                  Try Again
+                </Button>
+              </>
+            ) : (
+              /* Default error for API/network issues */
+              <>
+                <h3 className="text-lg font-semibold text-destructive mb-2">Unable to Load Data</h3>
+                <p className="text-destructive/80 mb-4" data-testid="text-error-message">
+                  Some data sources are currently unavailable. Please try again later.
+                </p>
+                <Button
+                  onClick={handleRefresh}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  data-testid="button-retry"
+                >
+                  Try Again
+                </Button>
+              </>
+            )}
           </div>
         )}
 
