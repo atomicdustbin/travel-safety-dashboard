@@ -7,6 +7,135 @@ export class DataFetcher {
     restCountries: process.env.REST_COUNTRIES_API_KEY || "",
   };
 
+  // Comprehensive list of valid countries and territories
+  private validCountries = new Set([
+    // Major countries
+    "afghanistan", "albania", "algeria", "andorra", "angola", "antigua and barbuda", "argentina", 
+    "armenia", "australia", "austria", "azerbaijan", "bahamas", "bahrain", "bangladesh", "barbados", 
+    "belarus", "belgium", "belize", "benin", "bhutan", "bolivia", "bosnia and herzegovina", "botswana", 
+    "brazil", "brunei", "bulgaria", "burkina faso", "burundi", "cambodia", "cameroon", "canada", 
+    "cape verde", "central african republic", "chad", "chile", "china", "colombia", "comoros", 
+    "congo", "costa rica", "croatia", "cuba", "cyprus", "czech republic", "denmark", "djibouti", 
+    "dominica", "dominican republic", "ecuador", "egypt", "el salvador", "equatorial guinea", "eritrea", 
+    "estonia", "eswatini", "ethiopia", "fiji", "finland", "france", "gabon", "gambia", "georgia", 
+    "germany", "ghana", "greece", "grenada", "guatemala", "guinea", "guinea-bissau", "guyana", "haiti", 
+    "honduras", "hungary", "iceland", "india", "indonesia", "iran", "iraq", "ireland", "israel", 
+    "italy", "ivory coast", "jamaica", "japan", "jordan", "kazakhstan", "kenya", "kiribati", "kosovo", 
+    "kuwait", "kyrgyzstan", "laos", "latvia", "lebanon", "lesotho", "liberia", "libya", "liechtenstein", 
+    "lithuania", "luxembourg", "madagascar", "malawi", "malaysia", "maldives", "mali", "malta", 
+    "marshall islands", "mauritania", "mauritius", "mexico", "micronesia", "moldova", "monaco", 
+    "mongolia", "montenegro", "morocco", "mozambique", "myanmar", "namibia", "nauru", "nepal", 
+    "netherlands", "new zealand", "nicaragua", "niger", "nigeria", "north korea", "north macedonia", 
+    "norway", "oman", "pakistan", "palau", "palestine", "panama", "papua new guinea", "paraguay", 
+    "peru", "philippines", "poland", "portugal", "qatar", "romania", "russia", "rwanda", 
+    "saint kitts and nevis", "saint lucia", "saint vincent and the grenadines", "samoa", "san marino", 
+    "sao tome and principe", "saudi arabia", "senegal", "serbia", "seychelles", "sierra leone", 
+    "singapore", "slovakia", "slovenia", "solomon islands", "somalia", "south africa", "south korea", 
+    "south sudan", "spain", "sri lanka", "sudan", "suriname", "sweden", "switzerland", "syria", 
+    "taiwan", "tajikistan", "tanzania", "thailand", "timor-leste", "togo", "tonga", "trinidad and tobago", 
+    "tunisia", "turkey", "turkmenistan", "tuvalu", "uganda", "ukraine", "united arab emirates", 
+    "united kingdom", "united states", "uruguay", "uzbekistan", "vanuatu", "vatican city", "venezuela", 
+    "vietnam", "yemen", "zambia", "zimbabwe",
+    // British territories and dependencies
+    "cayman islands", "british virgin islands", "anguilla", "bermuda", "gibraltar", "falkland islands",
+    "montserrat", "pitcairn islands", "saint helena", "turks and caicos islands",
+    // Other territories and common alternate names
+    "hong kong", "macau", "puerto rico", "guam", "american samoa", "northern mariana islands",
+    "us virgin islands", "cook islands", "niue", "tokelau", "french polynesia", "new caledonia",
+    "wallis and futuna", "mayotte", "reunion", "martinique", "guadeloupe", "french guiana",
+    "saint pierre and miquelon", "aruba", "curacao", "sint maarten", "faroe islands", "greenland",
+    "isle of man", "jersey", "guernsey", "aland islands"
+  ]);
+
+  // Common alternate names and spellings
+  private countryAliases: { [key: string]: string } = {
+    "usa": "united states",
+    "us": "united states",
+    "america": "united states",
+    "uk": "united kingdom",
+    "britain": "united kingdom",
+    "great britain": "united kingdom",
+    "england": "united kingdom",
+    "scotland": "united kingdom", 
+    "wales": "united kingdom",
+    "northern ireland": "united kingdom",
+    "south korea": "south korea",
+    "north korea": "north korea",
+    "russia": "russia",
+    "russian federation": "russia",
+    "czech republic": "czech republic",
+    "czechia": "czech republic",
+    "myanmar": "myanmar",
+    "burma": "myanmar",
+    "ivory coast": "ivory coast",
+    "cote d'ivoire": "ivory coast",
+    "east timor": "timor-leste",
+    "cape verde": "cape verde",
+    "cabo verde": "cape verde",
+    "swaziland": "eswatini",
+    "macedonia": "north macedonia",
+    "congo-brazzaville": "congo",
+    "congo-kinshasa": "congo",
+    "democratic republic of congo": "congo",
+    "drc": "congo"
+  };
+
+  // Validate if a country name is legitimate
+  validateCountryName(countryName: string): { isValid: boolean; normalizedName?: string; suggestion?: string } {
+    const normalizedInput = countryName.toLowerCase().trim();
+    
+    // Check if it's a direct match
+    if (this.validCountries.has(normalizedInput)) {
+      return { isValid: true, normalizedName: normalizedInput };
+    }
+    
+    // Check if it's an alias/alternate name
+    if (this.countryAliases[normalizedInput]) {
+      const normalizedName = this.countryAliases[normalizedInput];
+      return { isValid: true, normalizedName };
+    }
+    
+    // Check for partial matches (for suggestions)
+    const suggestions = Array.from(this.validCountries)
+      .filter(country => 
+        country.includes(normalizedInput) || 
+        normalizedInput.includes(country) ||
+        this.levenshteinDistance(normalizedInput, country) <= 2
+      )
+      .slice(0, 3); // Limit to 3 suggestions
+    
+    return { 
+      isValid: false, 
+      suggestion: suggestions.length > 0 ? suggestions[0] : undefined 
+    };
+  }
+
+  // Simple Levenshtein distance for typo detection
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i += 1) {
+      matrix[0][i] = i;
+    }
+    
+    for (let j = 0; j <= str2.length; j += 1) {
+      matrix[j][0] = j;
+    }
+    
+    for (let j = 1; j <= str2.length; j += 1) {
+      for (let i = 1; i <= str1.length; i += 1) {
+        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1, // deletion
+          matrix[j - 1][i] + 1, // insertion
+          matrix[j - 1][i - 1] + indicator, // substitution
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
   async fetchStateDeptAdvisories(countryName: string): Promise<InsertAlert[]> {
     try {
       const alerts: InsertAlert[] = [];
