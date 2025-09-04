@@ -35,32 +35,75 @@ export class DataFetcher {
 
   async fetchFCDOAdvisories(countryName: string): Promise<InsertAlert[]> {
     try {
-      // UK FCDO Travel Advice API
-      const response = await fetch(`https://www.gov.uk/api/foreign-travel-advice/${this.formatUrlSlug(countryName)}.json`);
+      const urlSlug = this.formatUrlSlug(countryName);
+      // Correct FCDO Content API format
+      const apiUrl = `https://www.gov.uk/api/content/foreign-travel-advice/${urlSlug}`;
       
-      if (!response.ok) return [];
+      console.log(`[FCDO DEBUG] Fetching for ${countryName}, URL: ${apiUrl}`);
+      
+      // UK FCDO Travel Advice API
+      const response = await fetch(apiUrl);
+      
+      console.log(`[FCDO DEBUG] Response status: ${response.status}`);
+      
+      if (!response.ok) {
+        console.log(`[FCDO DEBUG] Response not OK for ${countryName}: ${response.status} ${response.statusText}`);
+        return [];
+      }
       
       const data = await response.json();
+      console.log(`[FCDO DEBUG] Raw API data keys for ${countryName}:`, Object.keys(data));
+      console.log(`[FCDO DEBUG] Schema name: ${data.schema_name}, Document type: ${data.document_type}`);
+      
       const alerts: InsertAlert[] = [];
       const country = await storage.getCountryByName(countryName);
-      if (!country) return alerts;
+      if (!country) {
+        console.log(`[FCDO DEBUG] Country not found in storage: ${countryName}`);
+        return alerts;
+      }
 
+      // Check the correct structure based on FCDO Content API
       if (data.details) {
+        console.log(`[FCDO DEBUG] Found details for ${countryName}, details keys:`, Object.keys(data.details));
+        
+        // Extract travel advice information from the content API response
+        const title = data.title || `${countryName} Travel Advice`;
+        const summary = data.description || data.details.summary || "Current travel advice from UK FCDO";
+        const level = "Standard"; // FCDO doesn't use same level system as State Dept
+        
         alerts.push({
           countryId: country.id,
           source: "UK FCDO",
-          title: data.details.country?.name || "Travel Advice",
-          level: data.details.alert_status?.[0]?.alert_type || "Standard",
-          severity: this.mapFCDOSeverity(data.details.alert_status?.[0]?.alert_type),
-          summary: data.details.summary || "Check current travel advice",
-          link: `https://www.gov.uk/foreign-travel-advice/${this.formatUrlSlug(countryName)}`,
+          title: title,
+          level: level,
+          severity: "medium", // Default to medium for FCDO
+          summary: summary,
+          link: `https://www.gov.uk/foreign-travel-advice/${urlSlug}`,
           date: new Date(data.updated_at || Date.now()),
         });
+        console.log(`[FCDO DEBUG] Created alert for ${countryName}:`, alerts[0]);
+      } else {
+        console.log(`[FCDO DEBUG] No details found in API response for ${countryName}. Available keys:`, Object.keys(data));
+        
+        // Try to create a basic alert even without details
+        if (data.title || data.description) {
+          alerts.push({
+            countryId: country.id,
+            source: "UK FCDO",
+            title: data.title || `${countryName} Travel Advice`,
+            level: "Standard",
+            severity: "info",
+            summary: data.description || "Travel advice available from UK FCDO",
+            link: `https://www.gov.uk/foreign-travel-advice/${urlSlug}`,
+            date: new Date(data.updated_at || Date.now()),
+          });
+          console.log(`[FCDO DEBUG] Created basic alert for ${countryName}:`, alerts[0]);
+        }
       }
 
       return alerts;
     } catch (error) {
-      console.error("Error fetching FCDO advisories:", error);
+      console.error(`[FCDO DEBUG] Error fetching FCDO advisories for ${countryName}:`, error);
       return [];
     }
   }
