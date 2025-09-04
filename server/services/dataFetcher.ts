@@ -151,7 +151,7 @@ export class DataFetcher {
         level: `Level ${advisoryLevel}`,
         severity: this.mapStateDeptSeverity(advisoryLevel),
         summary: `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`,
-        link: `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatUrlSlug(countryName)}-travel-advisory.html`,
+        link: `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatStateDeptUrlSlug(countryName)}-travel-advisory.html`,
         date: new Date(),
       });
 
@@ -295,7 +295,7 @@ export class DataFetcher {
         level: healthConcerns.level,
         severity: healthConcerns.severity,
         summary: healthConcerns.summary,
-        link: `https://wwwnc.cdc.gov/travel/destinations/traveler/none/${this.formatUrlSlug(countryName)}`,
+        link: `https://wwwnc.cdc.gov/travel/destinations/traveler/none/${this.formatCDCUrlSlug(countryName)}`,
         date: new Date(),
       });
 
@@ -547,16 +547,31 @@ export class DataFetcher {
 
   private formatUrlSlug(countryName: string): string {
     // Handle special cases for URL formatting
+    // Note: Different external services use different URL formats
+    const lowerName = countryName.toLowerCase();
+    
+    // Standard format: replace spaces with hyphens
+    return lowerName.replace(/\s+/g, '-');
+  }
+
+  private formatStateDeptUrlSlug(countryName: string): string {
+    // State Department specific URL formatting
     const specialCases: { [key: string]: string } = {
-      "united kingdom": "uk",
       "united states": "usa",
       "south korea": "korea-south",
       "north korea": "korea-north",
-      "new zealand": "new-zealand",
-      "south africa": "south-africa",
-      "costa rica": "costa-rica",
-      "burkina faso": "burkina-faso",
-      "papua new guinea": "papua-new-guinea"
+    };
+    
+    const lowerName = countryName.toLowerCase();
+    return specialCases[lowerName] || lowerName.replace(/\s+/g, '-');
+  }
+
+  private formatCDCUrlSlug(countryName: string): string {
+    // CDC specific URL formatting
+    const specialCases: { [key: string]: string } = {
+      "united states": "usa",
+      "south korea": "korea-south", 
+      "north korea": "korea-north",
     };
     
     const lowerName = countryName.toLowerCase();
