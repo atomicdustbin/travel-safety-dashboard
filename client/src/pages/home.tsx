@@ -3,13 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { SearchSection } from "@/components/SearchSection";
 import { CountryCard } from "@/components/CountryCard";
 import { LoadingState } from "@/components/LoadingState";
+import { AuthModal } from "@/components/AuthModal";
+import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Globe, AlertCircle, Search } from "lucide-react";
+import { RefreshCw, Globe, AlertCircle, Search, LogIn } from "lucide-react";
 import { type SearchResult } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Home() {
   const [searchCountries, setSearchCountries] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [`/api/search?countries=${encodeURIComponent(searchCountries.join(","))}`],
@@ -53,6 +58,23 @@ export default function Home() {
     timeZoneName: "short",
   });
 
+  // Show authentication loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 bg-muted rounded-full animate-pulse mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication modal if user is not logged in
+  if (!isAuthenticated) {
+    return <AuthModal />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -79,6 +101,7 @@ export default function Home() {
               >
                 <RefreshCw className={`w-5 h-5 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
+              <UserMenu user={user} />
             </div>
           </div>
         </div>
@@ -142,72 +165,65 @@ export default function Home() {
 
         {/* Results */}
         {!isLoading && !error && searchResults.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="search-results">
-            {sortedResults.map((countryData) => (
-              <CountryCard key={countryData.country.id} countryData={countryData} />
-            ))}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-foreground" data-testid="text-results-title">
+                Travel Information for {searchResults.length} {searchResults.length === 1 ? 'Country' : 'Countries'}
+              </h2>
+              <div className="text-sm text-muted-foreground" data-testid="text-results-count">
+                {searchResults.length} result{searchResults.length === 1 ? '' : 's'} found
+              </div>
+            </div>
+            
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+              {sortedResults.map((countryData) => (
+                <CountryCard
+                  key={countryData.country.id}
+                  countryData={countryData}
+                />
+              ))}
+            </div>
           </div>
         )}
 
         {/* Empty State */}
         {!isLoading && !error && hasSearched && searchResults.length === 0 && (
-          <div className="text-center py-12" data-testid="no-results-state">
-            <AlertCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">No Results Found</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              No travel information found for the requested countries. Please check the spelling and try again.
+          <div className="text-center py-12" data-testid="empty-state">
+            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Results Found</h3>
+            <p className="text-muted-foreground">
+              No travel information found for the requested countries.
             </p>
           </div>
         )}
 
-        {/* Default Empty State */}
-        {!hasSearched && !isLoading && (
-          <div className="text-center py-12" data-testid="empty-state">
-            <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">Search for Countries</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Enter one or more country names above to view current travel advisories, alerts, and background information.
+        {/* Welcome State */}
+        {!isLoading && !error && !hasSearched && (
+          <div className="text-center py-16" data-testid="welcome-state">
+            <Globe className="w-16 h-16 text-primary mx-auto mb-6" />
+            <h2 className="text-3xl font-bold text-foreground mb-4">
+              Welcome to Global Travel Advisory
+            </h2>
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Get real-time travel alerts and comprehensive country information from trusted government sources including the US State Department, UK FCDO, and CDC.
             </p>
+            <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <span>Travel Advisories</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Globe className="w-5 h-5 text-blue-500" />
+                <span>Country Information</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Search className="w-5 h-5 text-green-500" />
+                <span>Real-time Updates</span>
+              </div>
+            </div>
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="bg-muted border-t border-border mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="font-semibold text-foreground mb-3">Data Sources</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• US State Department Travel Advisories</li>
-                <li>• UK FCDO Foreign Travel Advice</li>
-                <li>• CDC Travel Health Notices</li>
-                <li>• USGS Earthquake Data</li>
-                <li>• ReliefWeb Crisis Updates</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-3">Background Information</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• CIA World Factbook</li>
-                <li>• World Bank Country Indicators</li>
-                <li>• Wikivoyage Travel Guides</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-3">Update Frequency</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• Alert data: Every 6 hours</li>
-                <li>• Background data: Weekly</li>
-                <li>• Earthquake data: Real-time</li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-border mt-8 pt-6 text-center text-sm text-muted-foreground">
-            <p>This tool aggregates publicly available travel and safety information. Always consult official government sources for the most current travel guidance.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
