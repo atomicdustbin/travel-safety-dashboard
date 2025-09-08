@@ -1,4 +1,4 @@
-import { type Country, type Alert, type BackgroundInfo, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type CountryData } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type User, type SavedSearch, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertUser, type InsertSavedSearch, type CountryData } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -20,17 +20,34 @@ export interface IStorage {
   // Combined operations
   getCountryData(countryName: string): Promise<CountryData | undefined>;
   searchCountries(countryNames: string[]): Promise<CountryData[]>;
+
+  // User operations
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+
+  // Saved searches
+  getSavedSearchesByUserId(userId: string): Promise<SavedSearch[]>;
+  createSavedSearch(savedSearch: InsertSavedSearch): Promise<SavedSearch>;
+  deleteSavedSearch(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private countries: Map<string, Country>;
   private alerts: Map<string, Alert>;
   private backgroundInfo: Map<string, BackgroundInfo>;
+  private users: Map<string, User>;
+  private savedSearches: Map<string, SavedSearch>;
 
   constructor() {
     this.countries = new Map();
     this.alerts = new Map();
     this.backgroundInfo = new Map();
+    this.users = new Map();
+    this.savedSearches = new Map();
   }
 
   async getCountry(id: string): Promise<Country | undefined> {
@@ -144,6 +161,72 @@ export class MemStorage implements IStorage {
     }
     
     return results;
+  }
+
+  // User operations
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.email.toLowerCase() === email.toLowerCase()
+    );
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    if (!username) return undefined;
+    return Array.from(this.users.values()).find(
+      (user) => user.username?.toLowerCase() === username.toLowerCase()
+    );
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.googleId === googleId
+    );
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const user: User = {
+      ...insertUser,
+      id: randomUUID(),
+      isEmailVerified: insertUser.isEmailVerified || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+
+    const updated = { ...user, ...updates, updatedAt: new Date() };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  // Saved searches
+  async getSavedSearchesByUserId(userId: string): Promise<SavedSearch[]> {
+    return Array.from(this.savedSearches.values()).filter(
+      (search) => search.userId === userId
+    );
+  }
+
+  async createSavedSearch(insertSavedSearch: InsertSavedSearch): Promise<SavedSearch> {
+    const savedSearch: SavedSearch = {
+      ...insertSavedSearch,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+    this.savedSearches.set(savedSearch.id, savedSearch);
+    return savedSearch;
+  }
+
+  async deleteSavedSearch(id: string): Promise<void> {
+    this.savedSearches.delete(id);
   }
 }
 
