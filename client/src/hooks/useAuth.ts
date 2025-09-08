@@ -21,10 +21,7 @@ export function useRegister() {
   
   return useMutation({
     mutationFn: async (data: RegisterData) => {
-      return apiRequest("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/auth/register", data);
     },
     onSuccess: () => {
       // Refetch user data after successful registration
@@ -38,10 +35,7 @@ export function useLogin() {
   
   return useMutation({
     mutationFn: async (data: LoginData) => {
-      return apiRequest("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/auth/login", data);
     },
     onSuccess: () => {
       // Refetch user data after successful login
@@ -55,9 +49,7 @@ export function useLogout() {
   
   return useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/auth/logout", {
-        method: "POST",
-      });
+      return apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
       // Clear user data after logout
