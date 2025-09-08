@@ -1,10 +1,208 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import passport from "passport";
 import { storage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
+import { setupAuth, requireAuth, hashPassword } from "./auth";
+import { registerSchema, loginSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  setupAuth(app);
+
+  // Authentication routes
+  
+  // Register endpoint
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const result = registerSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          error: "Validation error", 
+          details: result.error.errors 
+        });
+      }
+
+      const { email, username, password, firstName, lastName } = result.data;
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists with this email" });
+      }
+
+      if (username) {
+        const existingUsername = await storage.getUserByUsername(username);
+        if (existingUsername) {
+          return res.status(400).json({ error: "Username already taken" });
+        }
+      }
+
+      // Hash password and create user
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createUser({
+        email,
+        username: username || null,
+        passwordHash,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        profileImageUrl: null,
+        isEmailVerified: false,
+        googleId: null,
+      });
+
+      // Log the user in automatically
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Login error after registration:", err);
+          return res.status(500).json({ error: "Registration successful but login failed" });
+        }
+        
+        res.json({ 
+          message: "Registration successful", 
+          user: { 
+            id: user.id, 
+            email: user.email, 
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            profileImageUrl: user.profileImageUrl 
+          } 
+        });
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Login endpoint
+  app.post("/api/auth/login", (req, res, next) => {
+    const result = loginSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: "Validation error", 
+        details: result.error.errors 
+      });
+    }
+
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Login failed" });
+      }
+      
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return res.status(500).json({ error: "Login failed" });
+        }
+        
+        res.json({ 
+          message: "Login successful", 
+          user: { 
+            id: user.id, 
+            email: user.email, 
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            profileImageUrl: user.profileImageUrl 
+          } 
+        });
+      });
+    })(req, res, next);
+  });
+
+  // Logout endpoint
+  app.post("/api/auth/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ message: "Logout successful" });
+    });
+  });
+
+  // Get current user endpoint
+  app.get("/api/auth/user", (req, res) => {
+    if (req.isAuthenticated() && req.user) {
+      const user = req.user as any;
+      res.json({ 
+        id: user.id, 
+        email: user.email, 
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl 
+      });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", 
+    passport.authenticate("google", { scope: ["profile", "email"] })
+  );
+
+  app.get("/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
+    (req, res) => {
+      // Successful authentication, redirect to frontend
+      res.redirect("/?auth=success");
+    }
+  );
+
+  // Saved searches routes (protected)
+  app.get("/api/saved-searches", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const savedSearches = await storage.getSavedSearchesByUserId(user.id);
+      res.json({ savedSearches });
+    } catch (error) {
+      console.error("Error fetching saved searches:", error);
+      res.status(500).json({ error: "Failed to fetch saved searches" });
+    }
+  });
+
+  app.post("/api/saved-searches", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { name, countries } = req.body;
+      
+      if (!name || !countries || !Array.isArray(countries)) {
+        return res.status(400).json({ error: "Name and countries array are required" });
+      }
+
+      const savedSearch = await storage.createSavedSearch({
+        userId: user.id,
+        name,
+        countries,
+      });
+
+      res.json({ savedSearch });
+    } catch (error) {
+      console.error("Error creating saved search:", error);
+      res.status(500).json({ error: "Failed to create saved search" });
+    }
+  });
+
+  app.delete("/api/saved-searches/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSavedSearch(id);
+      res.json({ message: "Saved search deleted" });
+    } catch (error) {
+      console.error("Error deleting saved search:", error);
+      res.status(500).json({ error: "Failed to delete saved search" });
+    }
+  });
+
   // Search countries endpoint
   app.get("/api/search", async (req, res) => {
     try {
