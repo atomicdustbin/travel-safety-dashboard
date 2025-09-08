@@ -78,7 +78,7 @@ export function AuthModal() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <Globe className="w-8 h-8 text-primary mr-2" />
-            <h1 className="text-2xl font-bold text-foreground">Travel Safety Dashboard</h1>
+            <h1 className="text-2xl font-bold text-foreground">Global Advisor</h1>
           </div>
           <p className="text-muted-foreground">
             Get real-time travel alerts and country information from government sources
