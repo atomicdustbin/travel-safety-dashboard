@@ -20,7 +20,6 @@ export function AuthModal() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
-      username: "",
       password: "",
       confirmPassword: "",
       firstName: "",
@@ -186,21 +185,6 @@ export function AuthModal() {
                     {registerForm.formState.errors.email && (
                       <p className="text-sm text-destructive">
                         {registerForm.formState.errors.email.message}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="register-username">Username (optional)</Label>
-                    <Input
-                      id="register-username"
-                      placeholder="Choose a username"
-                      data-testid="input-register-username"
-                      {...registerForm.register("username")}
-                    />
-                    {registerForm.formState.errors.username && (
-                      <p className="text-sm text-destructive">
-                        {registerForm.formState.errors.username.message}
                       </p>
                     )}
                   </div>

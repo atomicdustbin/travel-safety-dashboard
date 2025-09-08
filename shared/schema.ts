@@ -88,7 +88,7 @@ export const insertSavedSearchSchema = createInsertSchema(savedSearches).omit({
 });
 
 // Registration schema with validation
-export const registerSchema = insertUserSchema.omit({ passwordHash: true }).extend({
+export const registerSchema = insertUserSchema.omit({ passwordHash: true, username: true }).extend({
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
