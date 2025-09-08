@@ -12,6 +12,13 @@ export function CountryCard({ countryData }: CountryCardProps) {
   const { country, alerts, background } = countryData;
   const [flagError, setFlagError] = useState(false);
 
+  // Utility function to capitalize country names
+  const capitalizeCountryName = (name: string) => {
+    return name.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+  };
+
   // Find US State Department alert and extract threat level
   const getStateDeptThreatLevel = () => {
     const stateDeptAlert = alerts.find(alert => alert.source === "US State Dept");
@@ -99,13 +106,13 @@ export function CountryCard({ countryData }: CountryCardProps) {
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold text-foreground" data-testid={`text-country-name-${country.id}`}>
-            {country.name}
+            {capitalizeCountryName(country.name)}
           </h3>
           <div className="flex items-center space-x-2">
             {country.flagUrl && !flagError ? (
               <img
                 src={country.flagUrl}
-                alt={`${country.name} flag`}
+                alt={`${capitalizeCountryName(country.name)} flag`}
                 className="w-8 h-6 rounded border"
                 data-testid={`img-flag-${country.id}`}
                 onError={() => setFlagError(true)}
