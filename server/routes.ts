@@ -5,7 +5,9 @@ import { storage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
 import { setupAuth, requireAuth, hashPassword } from "./auth";
-import { registerSchema, loginSchema } from "@shared/schema";
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from "@shared/schema";
+import { sendEmail, generatePasswordResetEmail, generatePasswordResetConfirmationEmail } from "./emailService";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -200,6 +202,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting saved search:", error);
       res.status(500).json({ error: "Failed to delete saved search" });
+    }
+  });
+
+  // Password reset endpoints
+  
+  // Rate limiting map for password reset requests
+  const resetRequestLimits = new Map<string, { count: number; lastRequest: Date }>();
+  
+  // Helper function to check rate limiting
+  const checkRateLimit = (identifier: string, maxRequests = 3, windowMs = 60 * 60 * 1000): boolean => {
+    const now = new Date();
+    const existing = resetRequestLimits.get(identifier);
+    
+    if (!existing) {
+      resetRequestLimits.set(identifier, { count: 1, lastRequest: now });
+      return true;
+    }
+    
+    // Reset if window expired
+    if (now.getTime() - existing.lastRequest.getTime() > windowMs) {
+      resetRequestLimits.set(identifier, { count: 1, lastRequest: now });
+      return true;
+    }
+    
+    // Check if limit exceeded
+    if (existing.count >= maxRequests) {
+      return false;
+    }
+    
+    // Increment count
+    existing.count++;
+    existing.lastRequest = now;
+    return true;
+  };
+
+  // Forgot password endpoint
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const result = forgotPasswordSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          error: "Validation error", 
+          details: result.error.errors 
+        });
+      }
+
+      const { email } = result.data;
+      
+      // Rate limiting by email
+      if (!checkRateLimit(email)) {
+        return res.status(429).json({ 
+          error: "Too many password reset requests. Please try again later." 
+        });
+      }
+      
+      // Always respond with success to prevent email enumeration
+      res.json({ 
+        message: "If an account with that email exists, we've sent a password reset link." 
+      });
+      
+      // Check if user exists (but don't reveal this in response)
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return; // Don't send email if user doesn't exist
+      }
+      
+      // Generate secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      
+      // Store token with 30 minute expiration
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      });
+      
+      // Send reset email
+      const emailParams = generatePasswordResetEmail(email, resetToken, user.firstName || undefined);
+      const emailSent = await sendEmail(emailParams);
+      
+      if (!emailSent) {
+        console.error('Failed to send password reset email to:', email);
+      }
+      
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      // Still return success to prevent information leakage
+      res.json({ 
+        message: "If an account with that email exists, we've sent a password reset link." 
+      });
+    }
+  });
+
+  // Reset password endpoint
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const result = resetPasswordSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          error: "Validation error", 
+          details: result.error.errors 
+        });
+      }
+
+      const { token, password } = result.data;
+      
+      // Hash the token to find it in database
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      
+      // Get and validate token
+      const resetToken = await storage.getPasswordResetToken(tokenHash);
+      if (!resetToken) {
+        return res.status(400).json({ 
+          error: "Invalid or expired reset token" 
+        });
+      }
+      
+      if (resetToken.used) {
+        return res.status(400).json({ 
+          error: "Reset token has already been used" 
+        });
+      }
+      
+      // Get user
+      const user = await storage.getUserById(resetToken.userId);
+      if (!user) {
+        return res.status(400).json({ 
+          error: "User not found" 
+        });
+      }
+      
+      // Hash new password and update user
+      const passwordHash = await hashPassword(password);
+      await storage.updateUser(user.id, { passwordHash });
+      
+      // Mark token as used
+      await storage.markTokenAsUsed(tokenHash);
+      
+      // Send confirmation email
+      const confirmationEmail = generatePasswordResetConfirmationEmail(
+        user.email, 
+        user.firstName || undefined
+      );
+      await sendEmail(confirmationEmail);
+      
+      // Clean up expired tokens
+      await storage.cleanupExpiredTokens();
+      
+      res.json({ message: "Password reset successful" });
+      
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

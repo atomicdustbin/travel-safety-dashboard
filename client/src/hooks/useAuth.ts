@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { User, RegisterData, LoginData } from "@shared/schema";
+import type { User, RegisterData, LoginData, ForgotPasswordData, ResetPasswordData } from "@shared/schema";
 
 export function useAuth() {
   const { data: user, isLoading, error } = useQuery({
@@ -54,6 +54,28 @@ export function useLogout() {
     onSuccess: () => {
       // Clear user data after logout
       queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+    },
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: async (data: ForgotPasswordData) => {
+      return apiRequest("POST", "/api/auth/forgot-password", data);
+    },
+  });
+}
+
+export function useResetPassword() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: ResetPasswordData) => {
+      return apiRequest("POST", "/api/auth/reset-password", data);
+    },
+    onSuccess: () => {
+      // Clear any cached user data after password reset
       queryClient.clear();
     },
   });

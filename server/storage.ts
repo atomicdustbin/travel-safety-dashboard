@@ -1,4 +1,4 @@
-import { type Country, type Alert, type BackgroundInfo, type User, type SavedSearch, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertUser, type InsertSavedSearch, type CountryData } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type User, type SavedSearch, type PasswordResetToken, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertUser, type InsertSavedSearch, type InsertPasswordResetToken, type CountryData } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -33,6 +33,12 @@ export interface IStorage {
   getSavedSearchesByUserId(userId: string): Promise<SavedSearch[]>;
   createSavedSearch(savedSearch: InsertSavedSearch): Promise<SavedSearch>;
   deleteSavedSearch(id: string): Promise<void>;
+
+  // Password reset tokens
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(tokenHash: string): Promise<PasswordResetToken | undefined>;
+  markTokenAsUsed(tokenHash: string): Promise<void>;
+  cleanupExpiredTokens(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -41,6 +47,7 @@ export class MemStorage implements IStorage {
   private backgroundInfo: Map<string, BackgroundInfo>;
   private users: Map<string, User>;
   private savedSearches: Map<string, SavedSearch>;
+  private passwordResetTokens: Map<string, PasswordResetToken>;
 
   constructor() {
     this.countries = new Map();
@@ -48,6 +55,7 @@ export class MemStorage implements IStorage {
     this.backgroundInfo = new Map();
     this.users = new Map();
     this.savedSearches = new Map();
+    this.passwordResetTokens = new Map();
   }
 
   async getCountry(id: string): Promise<Country | undefined> {
@@ -227,6 +235,54 @@ export class MemStorage implements IStorage {
 
   async deleteSavedSearch(id: string): Promise<void> {
     this.savedSearches.delete(id);
+  }
+
+  // Password reset tokens
+  async createPasswordResetToken(insertToken: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const token: PasswordResetToken = {
+      ...insertToken,
+      id: randomUUID(),
+      used: false,
+      createdAt: new Date(),
+    };
+    this.passwordResetTokens.set(token.tokenHash, token);
+    return token;
+  }
+
+  async getPasswordResetToken(tokenHash: string): Promise<PasswordResetToken | undefined> {
+    const token = this.passwordResetTokens.get(tokenHash);
+    if (!token) return undefined;
+    
+    // Check if token has expired
+    if (token.expiresAt < new Date()) {
+      this.passwordResetTokens.delete(tokenHash);
+      return undefined;
+    }
+    
+    return token;
+  }
+
+  async markTokenAsUsed(tokenHash: string): Promise<void> {
+    const token = this.passwordResetTokens.get(tokenHash);
+    if (token) {
+      const updatedToken = { ...token, used: true };
+      this.passwordResetTokens.set(tokenHash, updatedToken);
+    }
+  }
+
+  async cleanupExpiredTokens(): Promise<void> {
+    const now = new Date();
+    const tokensToDelete: string[] = [];
+    
+    this.passwordResetTokens.forEach((token, tokenHash) => {
+      if (token.expiresAt < now || token.used) {
+        tokensToDelete.push(tokenHash);
+      }
+    });
+    
+    tokensToDelete.forEach(tokenHash => {
+      this.passwordResetTokens.delete(tokenHash);
+    });
   }
 }
 

@@ -4,6 +4,7 @@ import { SearchSection } from "@/components/SearchSection";
 import { CountryCard } from "@/components/CountryCard";
 import { LoadingState } from "@/components/LoadingState";
 import { AuthModal } from "@/components/AuthModal";
+import { ResetPasswordForm } from "@/components/ResetPasswordForm";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Globe, AlertCircle, Search, LogIn } from "lucide-react";
@@ -15,6 +16,10 @@ export default function Home() {
   const [hasSearched, setHasSearched] = useState(false);
 
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+
+  // Check for reset token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('reset-token');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [`/api/search?countries=${encodeURIComponent(searchCountries.join(","))}`],
@@ -68,6 +73,11 @@ export default function Home() {
         </div>
       </div>
     );
+  }
+
+  // Show reset password form if reset token is present
+  if (resetToken) {
+    return <ResetPasswordForm token={resetToken} />;
   }
 
   // Show authentication modal if user is not logged in

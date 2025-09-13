@@ -7,14 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useRegister, useLogin } from "@/hooks/useAuth";
-import { registerSchema, loginSchema, type RegisterData, type LoginData } from "@shared/schema";
-import { Globe, LogIn, UserPlus } from "lucide-react";
+import { useRegister, useLogin, useForgotPassword } from "@/hooks/useAuth";
+import { registerSchema, loginSchema, forgotPasswordSchema, type RegisterData, type LoginData, type ForgotPasswordData } from "@shared/schema";
+import { Globe, LogIn, UserPlus, ArrowLeft } from "lucide-react";
 
 export function AuthModal() {
   const { toast } = useToast();
+  const [view, setView] = useState<'auth' | 'forgot-password'>('auth');
   const registerMutation = useRegister();
   const loginMutation = useLogin();
+  const forgotPasswordMutation = useForgotPassword();
 
   const registerForm = useForm<RegisterData>({
     resolver: zodResolver(registerSchema),
@@ -32,6 +34,13 @@ export function AuthModal() {
     defaultValues: {
       email: "",
       password: "",
+    },
+  });
+
+  const forgotPasswordForm = useForm<ForgotPasswordData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
     },
   });
 
@@ -67,9 +76,92 @@ export function AuthModal() {
     }
   };
 
+  const onForgotPassword = async (data: ForgotPasswordData) => {
+    try {
+      await forgotPasswordMutation.mutateAsync(data);
+      toast({
+        title: "Reset link sent",
+        description: "If an account with that email exists, we've sent a password reset link.",
+      });
+      setView('auth'); // Return to login view
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reset email",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
   };
+
+  if (view === 'forgot-password') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <Globe className="w-8 h-8 text-primary mr-2" />
+              <h1 className="text-2xl font-bold text-foreground">Global Advisor</h1>
+            </div>
+            <p className="text-muted-foreground">
+              Reset your password
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl text-center">Forgot Password</CardTitle>
+              <CardDescription className="text-center">
+                Enter your email address and we'll send you a link to reset your password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPassword)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email">Email</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    data-testid="input-forgot-email"
+                    {...forgotPasswordForm.register("email")}
+                  />
+                  {forgotPasswordForm.formState.errors.email && (
+                    <p className="text-sm text-destructive">
+                      {forgotPasswordForm.formState.errors.email.message}
+                    </p>
+                  )}
+                </div>
+                
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={forgotPasswordMutation.isPending}
+                  data-testid="button-forgot-password"
+                >
+                  {forgotPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setView('auth')}
+                  data-testid="button-back-to-login"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Sign In
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -147,6 +239,18 @@ export function AuthModal() {
                       </>
                     )}
                   </Button>
+                  
+                  <div className="text-center">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="text-sm"
+                      onClick={() => setView('forgot-password')}
+                      data-testid="button-forgot-password-link"
+                    >
+                      Forgot your password?
+                    </Button>
+                  </div>
                 </form>
               </TabsContent>
               

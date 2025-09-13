@@ -61,6 +61,15 @@ export const savedSearches = pgTable("saved_searches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertCountrySchema = createInsertSchema(countries).omit({
   lastUpdated: true,
@@ -87,6 +96,25 @@ export const insertSavedSearchSchema = createInsertSchema(savedSearches).omit({
   createdAt: true,
 });
 
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Password reset schemas
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 // Registration schema with validation
 export const registerSchema = insertUserSchema.omit({ passwordHash: true, username: true }).extend({
   email: z.string().email("Invalid email address"),
@@ -109,13 +137,17 @@ export type Alert = typeof alerts.$inferSelect;
 export type BackgroundInfo = typeof backgroundInfo.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type SavedSearch = typeof savedSearches.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertCountry = z.infer<typeof insertCountrySchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type InsertBackgroundInfo = z.infer<typeof insertBackgroundInfoSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertSavedSearch = z.infer<typeof insertSavedSearchSchema>;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type RegisterData = z.infer<typeof registerSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
+export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
 
 // Combined types for API responses
 export type CountryData = {
