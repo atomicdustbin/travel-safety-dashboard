@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { type InsertAlert, type InsertBackgroundInfo } from "@shared/schema";
+import { enhanceStateDeptSummary, isAIEnhancementAvailable } from "../aiService";
 
 export class DataFetcher {
   private apiKeys = {
@@ -142,17 +143,51 @@ export class DataFetcher {
       const country = await storage.getCountryByName(countryName);
       if (!country) return alerts;
 
-      // Create a representative State Department advisory based on country
+      // Create the basic advisory structure
       const advisoryLevel = this.getDefaultAdvisoryLevel(countryName);
+      const baseTitle = `Travel Advisory - Level ${advisoryLevel}`;
+      const baseSummary = `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`;
+      const advisoryLink = `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatStateDeptUrlSlug(countryName)}-travel-advisory.html`;
+
+      // Enhanced summary using AI if available
+      let finalSummary = baseSummary;
+      let enhancedTitle = baseTitle;
+      
+      let enhancedData = null;
+      if (isAIEnhancementAvailable()) {
+        try {
+          const enhanced = await enhanceStateDeptSummary(baseSummary, advisoryLink, countryName);
+          if (enhanced.summary && enhanced.summary !== baseSummary) {
+            finalSummary = enhanced.summary;
+            enhancedData = enhanced;
+          }
+          
+          // If AI found specific risks, add them to the title
+          if (enhanced.keyRisks && enhanced.keyRisks.length > 0) {
+            enhancedTitle = `${baseTitle} - ${enhanced.keyRisks.slice(0, 2).join(", ")}`;
+          }
+          
+          console.log(`AI enhancement successful for ${countryName}`);
+        } catch (error) {
+          console.warn(`AI enhancement failed for ${countryName}:`, error);
+          // Continue with basic summary
+        }
+      }
+
       alerts.push({
         countryId: country.id,
         source: "US State Dept",
-        title: `Travel Advisory - Level ${advisoryLevel}`,
+        title: enhancedTitle,
         level: `Level ${advisoryLevel}`,
         severity: this.mapStateDeptSeverity(advisoryLevel),
-        summary: `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`,
-        link: `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatStateDeptUrlSlug(countryName)}-travel-advisory.html`,
+        summary: finalSummary,
+        link: advisoryLink,
         date: new Date(),
+        // Add AI-enhanced data if available
+        keyRisks: enhancedData?.keyRisks || null,
+        safetyRecommendations: enhancedData?.safetyRecommendations || null,
+        specificAreas: enhancedData?.specificAreas || null,
+        aiEnhanced: enhancedData ? new Date() : null,
       });
 
       return alerts;

@@ -22,6 +22,11 @@ export const alerts = pgTable("alerts", {
   link: text("link").notNull(),
   date: timestamp("date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  // AI-enhanced data (only populated for US State Dept advisories when AI is available)
+  keyRisks: json("key_risks").$type<string[]>(),
+  safetyRecommendations: json("safety_recommendations").$type<string[]>(),
+  specificAreas: json("specific_areas").$type<string[]>(),
+  aiEnhanced: timestamp("ai_enhanced"), // When AI enhancement was last performed
 });
 
 export const backgroundInfo = pgTable("background_info", {

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, FileText, ExternalLink, Globe } from "lucide-react";
+import { AlertTriangle, FileText, ExternalLink, Globe, Brain, Shield, MapPin } from "lucide-react";
 import { type CountryData } from "@shared/schema";
 import { useState } from "react";
 
@@ -164,6 +164,63 @@ export function CountryCard({ countryData }: CountryCardProps) {
                   <p className="text-sm mb-2" data-testid={`text-alert-summary-${country.id}-${index}`}>
                     {alert.summary}
                   </p>
+                  
+                  {/* AI-Enhanced Information for US State Dept */}
+                  {alert.source === "US State Dept" && alert.aiEnhanced && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center mb-2">
+                        <Brain className="w-4 h-4 mr-1 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-800 bg-blue-50 px-2 py-1 rounded">
+                          AI Enhanced Analysis
+                        </span>
+                      </div>
+                      
+                      {alert.keyRisks && alert.keyRisks.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex items-center mb-1">
+                            <AlertTriangle className="w-3 h-3 mr-1 text-red-500" />
+                            <span className="text-xs font-semibold text-gray-700">Key Risks</span>
+                          </div>
+                          <ul className="text-xs text-gray-600 ml-4 space-y-0.5">
+                            {alert.keyRisks.slice(0, 4).map((risk, riskIndex) => (
+                              <li key={riskIndex} className="list-disc" data-testid={`text-risk-${country.id}-${index}-${riskIndex}`}>
+                                {risk}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {alert.safetyRecommendations && alert.safetyRecommendations.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex items-center mb-1">
+                            <Shield className="w-3 h-3 mr-1 text-green-500" />
+                            <span className="text-xs font-semibold text-gray-700">Safety Recommendations</span>
+                          </div>
+                          <ul className="text-xs text-gray-600 ml-4 space-y-0.5">
+                            {alert.safetyRecommendations.slice(0, 4).map((rec, recIndex) => (
+                              <li key={recIndex} className="list-disc" data-testid={`text-recommendation-${country.id}-${index}-${recIndex}`}>
+                                {rec}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {alert.specificAreas && alert.specificAreas.length > 0 && (
+                        <div className="mb-2">
+                          <div className="flex items-center mb-1">
+                            <MapPin className="w-3 h-3 mr-1 text-purple-500" />
+                            <span className="text-xs font-semibold text-gray-700">Specific Areas</span>
+                          </div>
+                          <p className="text-xs text-gray-600 ml-4" data-testid={`text-areas-${country.id}-${index}`}>
+                            {alert.specificAreas.slice(0, 5).join(", ")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <a
                     href={alert.link}
                     className="text-sm text-primary hover:text-primary/80 font-medium inline-flex items-center"
