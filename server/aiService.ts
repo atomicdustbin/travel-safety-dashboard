@@ -60,11 +60,15 @@ export async function enhanceStateDeptSummary(
 
 async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
   try {
+    console.log(`[DEBUG] Fetching URL: ${url}`);
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Global Advisor Bot/1.0)'
       }
     });
+
+    console.log(`[DEBUG] Response status: ${response.status}`);
+    console.log(`[DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       console.warn(`Failed to fetch advisory page: ${response.status}`);
@@ -72,56 +76,145 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
     }
 
     const html = await response.text();
+    console.log(`[DEBUG] Raw HTML length: ${html.length}`);
+    console.log(`[DEBUG] Raw HTML preview: ${html.substring(0, 500)}`);
+    
+    // Check for CAPTCHA protection
+    const captchaIndicators = /recaptcha|grecaptcha|START CAPTCHA|captcha/i;
+    if (captchaIndicators.test(html)) {
+      console.warn(`[DEBUG] CAPTCHA detected in page - skipping content extraction`);
+      return null;
+    }
+    
+    // Check if page appears to be JavaScript-dependent or too short
+    if (html.includes('window.location') || html.includes('document.createElement') || html.length < 1000) {
+      console.warn(`[DEBUG] Page may be JavaScript-dependent or redirecting`);
+    }
     
     // Parse HTML and extract main content
     const dom = new JSDOM(html);
     const document = dom.window.document;
     
-    // Remove scripts, styles, navigation, and other non-content elements  
+    // Save HTML for debugging if needed
+    if (html.length > 100000) {
+      console.log(`[DEBUG] Large HTML detected (${html.length} chars) - analyzing structure`);
+    }
+    
+    // Remove scripts, styles, navigation, and other non-content elements first
     const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, .navigation, .sidebar, .ads, .breadcrumb, .site-header, .site-footer, .skip-link, .menu, .navbar, #header, #footer, #navigation');
     elementsToRemove.forEach(element => element.remove());
     
-    // State Department specific content selectors
-    let mainContent = document.querySelector('.travel-advisory-content, .advisory-content, .page-content, .entry-content, .content-main, article, .text-content, #content, [role="main"]');
+    // Try multiple State Department specific strategies
+    let mainContent: Element | null = null;
+    let extractionMethod = 'unknown';
     
-    // If specific selectors don't work, try to find content by looking for travel advisory keywords
-    if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 100)) {
-      // Look for elements containing travel advisory keywords
-      const allDivs = Array.from(document.querySelectorAll('div, section, article'));
-      for (const div of allDivs) {
-        const text = div.textContent || '';
-        if (text.length > 500 && (
-          text.toLowerCase().includes('travel advisory') ||
-          text.toLowerCase().includes('do not travel') ||
-          text.toLowerCase().includes('reconsider travel') ||
-          text.toLowerCase().includes('exercise caution') ||
-          text.toLowerCase().includes('security situation') ||
-          text.toLowerCase().includes('crime') ||
-          text.toLowerCase().includes('terrorism')
-        )) {
-          mainContent = div;
-          break;
+    // Strategy 1: Look for State Department specific content containers
+    const stateDeptSelectors = [
+      '.tsg-rwd-travel-advice-wrapper',
+      '.tsg-rwd-content-main',  
+      '.advisory-content',
+      '.travel-advisory-content',
+      '.content-wrapper',
+      '.main-content-wrapper',
+      '#main-content',
+      '.page-content',
+      '[data-component="travel-advisory"]'
+    ];
+    
+    for (const selector of stateDeptSelectors) {
+      mainContent = document.querySelector(selector);
+      if (mainContent && mainContent.textContent && mainContent.textContent.length > 500) {
+        extractionMethod = `selector: ${selector}`;
+        console.log(`[DEBUG] Found content using ${extractionMethod}`);
+        break;
+      }
+    }
+    
+    // Strategy 2: Look for elements with travel advisory keywords and substantial content
+    if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 500)) {
+      console.log(`[DEBUG] Trying keyword-based content detection`);
+      const allElements = Array.from(document.querySelectorAll('div, section, article, main, [role="main"]'));
+      
+      for (const element of allElements) {
+        const text = element.textContent || '';
+        if (text.length > 1000) { // Require substantial content
+          const lowerText = text.toLowerCase();
+          const keywordMatches = [
+            lowerText.includes('travel advisory'),
+            lowerText.includes('exercise caution'),
+            lowerText.includes('security situation'),
+            lowerText.includes('entry requirements'),
+            lowerText.includes('local laws'),
+            lowerText.includes('embassy'),
+            lowerText.includes('crime'),
+            lowerText.includes('terrorism'),
+            lowerText.includes('demonstration'),
+            lowerText.includes('health and safety')
+          ].filter(Boolean).length;
+          
+          if (keywordMatches >= 3) { // Must match multiple keywords
+            mainContent = element;
+            extractionMethod = `keywords: ${keywordMatches} matches`;
+            console.log(`[DEBUG] Found content using ${extractionMethod}, length: ${text.length}`);
+            break;
+          }
         }
       }
     }
     
-    // Last resort: use body but remove obvious navigation elements
+    // Strategy 3: Look for the largest content block that seems meaningful
+    if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 500)) {
+      console.log(`[DEBUG] Trying largest content block strategy`);
+      const contentElements = Array.from(document.querySelectorAll('div, section, article'));
+      let largestElement: Element | null = null;
+      let largestSize = 0;
+      
+      for (const element of contentElements) {
+        const text = element.textContent || '';
+        if (text.length > largestSize && text.length > 1000) {
+          // Avoid navigation-heavy content
+          const navWords = (text.match(/home|about|contact|menu|navigation|footer|header/gi) || []).length;
+          const contentRatio = navWords / (text.split(' ').length || 1);
+          if (contentRatio < 0.1) { // Less than 10% navigation words
+            largestElement = element;
+            largestSize = text.length;
+          }
+        }
+      }
+      
+      if (largestElement) {
+        mainContent = largestElement;
+        extractionMethod = `largest block: ${largestSize} chars`;
+        console.log(`[DEBUG] Found content using ${extractionMethod}`);
+      }
+    }
+    
+    // Fallback: use body but clean heavily
     if (!mainContent) {
+      console.log(`[DEBUG] Using fallback body extraction`);
       mainContent = document.body;
-      // Remove more navigation elements
-      const navElements = document.querySelectorAll('a[href*="travel.state.gov"], a[href*="home"], a[href*="about"], a[href*="contact"], a[href*="careers"], .site-navigation, .main-navigation');
+      extractionMethod = 'body fallback';
+      
+      // Remove more navigation and fluff elements
+      const navElements = document.querySelectorAll('a[href*="travel.state.gov"], a[href*="home"], a[href*="about"], a[href*="contact"], a[href*="careers"], .site-navigation, .main-navigation, .footer, .header');
       navElements.forEach(element => element.remove());
     }
     
-    // Extract text content and clean it up
+    // Extract and clean text content
     let textContent = mainContent?.textContent || '';
+    console.log(`[DEBUG] Raw extracted content length: ${textContent.length} using ${extractionMethod}`);
+    
     textContent = textContent
       .replace(/\s+/g, ' ')  // Replace multiple whitespace with single space
       .replace(/\n\s*\n/g, '\n')  // Remove empty lines
       .replace(/Skip to main content/gi, '')  // Remove skip links
       .replace(/Travel\.State\.Gov/gi, '')  // Remove site branding
       .replace(/Home\|.*?\|/gi, '')  // Remove navigation breadcrumbs
+      .replace(/Congressional Liaison.*?Contact Us/gi, '')  // Remove header navigation
+      .replace(/Travel Advisories\s*\|\s*Newsroom/gi, '')  // Remove nav links
       .trim();
+    
+    console.log(`[DEBUG] Cleaned content length: ${textContent.length}`);
     
     return textContent;
 
@@ -166,28 +259,94 @@ Focus on extracting concrete, actionable information that would help travelers m
   console.log(`[DEBUG] Truncated content length for ${countryName}:`, truncatedContent.length);
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-      messages: [
+      input: [
         {
           role: "system",
-          content: "You are a travel safety expert who analyzes government travel advisories to provide detailed, practical guidance for travelers. Always respond with valid JSON."
+          content: "You are a travel safety expert who analyzes government travel advisories. You must respond with valid JSON that matches the required schema exactly."
         },
         {
           role: "user", 
           content: prompt
         }
       ],
-      response_format: { type: "json_object" },
+      text: {
+        format: {
+          type: "json_schema",
+          name: "AdvisoryAnalysis",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              summary: {
+                type: "string",
+                description: "A detailed 2-3 paragraph summary that goes beyond just the threat level, including specific context about current conditions, regional variations, and practical implications for travelers"
+              },
+              keyRisks: {
+                type: "array",
+                description: "List of 3-6 specific risks or threats mentioned, such as crime types, areas to avoid, health concerns, or political situations",
+                items: { type: "string" },
+                minItems: 2
+              },
+              safetyRecommendations: {
+                type: "array", 
+                description: "List of 3-6 specific safety recommendations and precautions travelers should take",
+                items: { type: "string" },
+                minItems: 2
+              },
+              specificAreas: {
+                type: "array",
+                description: "List of specific cities, regions, or areas mentioned in the advisory with particular conditions or recommendations",
+                items: { type: "string" },
+                minItems: 1
+              }
+            },
+            required: ["summary", "keyRisks", "safetyRecommendations", "specificAreas"],
+            additionalProperties: false
+          }
+        }
+      },
       // GPT-5 only supports default temperature (1), so we don't specify it
-      max_completion_tokens: 1000 // GPT-5 uses max_completion_tokens instead of max_tokens
+      max_output_tokens: 1000 // Responses API uses max_output_tokens instead of max_completion_tokens
     });
 
-    const rawContent = response.choices[0].message.content || '{}';
-    console.log(`[DEBUG] ChatGPT raw response for ${countryName}:`, rawContent);
+    // Extract structured JSON content from Responses API output
+    let rawContent = response.output_text || '';
+    
+    // Fallback to response.output[].content[].text if output_text is empty
+    if (!rawContent && response.output && response.output.length > 0) {
+      for (const output of response.output) {
+        if (output.content && output.content.length > 0) {
+          rawContent = output.content[0].text || '';
+          if (rawContent) break;
+        }
+      }
+    }
+    
+    // Final fallback
+    if (!rawContent) {
+      rawContent = '{}';
+    }
+    
+    console.log(`[DEBUG] ChatGPT Responses API output for ${countryName}:`, rawContent);
     
     const result = JSON.parse(rawContent);
     console.log(`[DEBUG] Parsed ChatGPT result for ${countryName}:`, JSON.stringify(result, null, 2));
+    
+    // Validate that required fields are present and meaningful
+    if (!result.summary || result.summary.length < 50) {
+      throw new Error('Invalid summary returned from ChatGPT');
+    }
+    if (!Array.isArray(result.keyRisks) || result.keyRisks.length < 1) {
+      throw new Error('Invalid keyRisks returned from ChatGPT');
+    }
+    if (!Array.isArray(result.safetyRecommendations) || result.safetyRecommendations.length < 1) {
+      throw new Error('Invalid safetyRecommendations returned from ChatGPT');
+    }
+    if (!Array.isArray(result.specificAreas) || result.specificAreas.length < 1) {
+      throw new Error('Invalid specificAreas returned from ChatGPT');
+    }
     
     // Validate the response structure
     const processedResult = {
