@@ -444,6 +444,59 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           background: #f9fafb;
           border-radius: 8px;
         }
+        
+        /* AI Enhancement Section Styles */
+        .ai-enhanced-section {
+          background: #f0f9ff;
+          border: 1px solid #bae6fd;
+          border-radius: 6px;
+          padding: 12px;
+          margin: 10px 0;
+        }
+        
+        .ai-enhanced-header {
+          margin-bottom: 10px;
+        }
+        
+        .ai-badge {
+          background: #2563eb;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+        
+        .ai-subsection {
+          margin-bottom: 10px;
+        }
+        
+        .ai-subsection:last-child {
+          margin-bottom: 0;
+        }
+        
+        .ai-subsection-title {
+          color: #1e40af;
+          font-size: 13px;
+          font-weight: 600;
+          margin-bottom: 5px;
+        }
+        
+        .ai-list {
+          margin: 0;
+          padding-left: 15px;
+          font-size: 12px;
+          color: #374151;
+          line-height: 1.4;
+        }
+        
+        .ai-list li {
+          margin-bottom: 3px;
+        }
+        
+        .ai-list li:last-child {
+          margin-bottom: 0;
+        }
       </style>
     </head>
     <body>
