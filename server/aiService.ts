@@ -141,7 +141,7 @@ Focus on extracting concrete, actionable information that would help travelers m
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3, // Lower temperature for more consistent, factual responses
+      // GPT-5 only supports default temperature (1), so we don't specify it
       max_completion_tokens: 1000 // GPT-5 uses max_completion_tokens instead of max_tokens
     });
 
