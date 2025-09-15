@@ -77,18 +77,50 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
     const dom = new JSDOM(html);
     const document = dom.window.document;
     
-    // Remove scripts, styles, navigation, and other non-content elements
-    const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, .navigation, .sidebar, .ads');
+    // Remove scripts, styles, navigation, and other non-content elements  
+    const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, .navigation, .sidebar, .ads, .breadcrumb, .site-header, .site-footer, .skip-link, .menu, .navbar, #header, #footer, #navigation');
     elementsToRemove.forEach(element => element.remove());
     
-    // Try to find the main content area
-    const mainContent = document.querySelector('main, .main-content, .content, .advisory-content, #main') || document.body;
+    // State Department specific content selectors
+    let mainContent = document.querySelector('.travel-advisory-content, .advisory-content, .page-content, .entry-content, .content-main, article, .text-content, #content, [role="main"]');
+    
+    // If specific selectors don't work, try to find content by looking for travel advisory keywords
+    if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 100)) {
+      // Look for elements containing travel advisory keywords
+      const allDivs = Array.from(document.querySelectorAll('div, section, article'));
+      for (const div of allDivs) {
+        const text = div.textContent || '';
+        if (text.length > 500 && (
+          text.toLowerCase().includes('travel advisory') ||
+          text.toLowerCase().includes('do not travel') ||
+          text.toLowerCase().includes('reconsider travel') ||
+          text.toLowerCase().includes('exercise caution') ||
+          text.toLowerCase().includes('security situation') ||
+          text.toLowerCase().includes('crime') ||
+          text.toLowerCase().includes('terrorism')
+        )) {
+          mainContent = div;
+          break;
+        }
+      }
+    }
+    
+    // Last resort: use body but remove obvious navigation elements
+    if (!mainContent) {
+      mainContent = document.body;
+      // Remove more navigation elements
+      const navElements = document.querySelectorAll('a[href*="travel.state.gov"], a[href*="home"], a[href*="about"], a[href*="contact"], a[href*="careers"], .site-navigation, .main-navigation');
+      navElements.forEach(element => element.remove());
+    }
     
     // Extract text content and clean it up
     let textContent = mainContent?.textContent || '';
     textContent = textContent
       .replace(/\s+/g, ' ')  // Replace multiple whitespace with single space
       .replace(/\n\s*\n/g, '\n')  // Remove empty lines
+      .replace(/Skip to main content/gi, '')  // Remove skip links
+      .replace(/Travel\.State\.Gov/gi, '')  // Remove site branding
+      .replace(/Home\|.*?\|/gi, '')  // Remove navigation breadcrumbs
       .trim();
     
     return textContent;
