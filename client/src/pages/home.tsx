@@ -142,7 +142,7 @@ export default function Home() {
 
         {/* Results */}
         {!isLoading && !error && searchResults.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="search-results">
+          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2" data-testid="search-results">
             {sortedResults.map((countryData) => (
               <CountryCard key={countryData.country.id} countryData={countryData} />
             ))}

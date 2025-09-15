@@ -6,7 +6,7 @@ interface LoadingStateProps {
 
 export function LoadingState({ count = 3 }: LoadingStateProps) {
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="loading-state">
+    <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2" data-testid="loading-state">
       {Array.from({ length: count }).map((_, index) => (
         <Card key={index} className="overflow-hidden" data-testid={`loading-card-${index}`}>
           <CardContent className="p-6">

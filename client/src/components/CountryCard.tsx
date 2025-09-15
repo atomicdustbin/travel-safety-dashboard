@@ -98,7 +98,7 @@ export function CountryCard({ countryData }: CountryCardProps) {
       
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-foreground" data-testid={`text-country-name-${country.id}`}>
+          <h3 className="text-xl font-semibold text-foreground capitalize" data-testid={`text-country-name-${country.id}`}>
             {country.name}
           </h3>
           <div className="flex items-center space-x-2">
