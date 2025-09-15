@@ -142,7 +142,7 @@ Focus on extracting concrete, actionable information that would help travelers m
       ],
       response_format: { type: "json_object" },
       temperature: 0.3, // Lower temperature for more consistent, factual responses
-      max_tokens: 1000
+      max_completion_tokens: 1000 // GPT-5 uses max_completion_tokens instead of max_tokens
     });
 
     const result = JSON.parse(response.choices[0].message.content || '{}');
