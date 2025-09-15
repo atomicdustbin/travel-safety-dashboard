@@ -21,8 +21,11 @@ export async function enhanceStateDeptSummary(
   try {
     // Fetch the full advisory page content
     const pageContent = await fetchAdvisoryPageContent(advisoryLink);
+    console.log(`[DEBUG] Page content length for ${countryName}:`, pageContent?.length || 0);
+    console.log(`[DEBUG] Page content preview for ${countryName}:`, pageContent?.substring(0, 200) || 'NO CONTENT');
     
     if (!pageContent) {
+      console.log(`[DEBUG] No page content fetched for ${countryName}, using fallback`);
       // Fallback to original summary if page fetch fails
       return {
         summary: originalSummary,
@@ -126,6 +129,9 @@ Please provide a comprehensive analysis in JSON format with these fields:
 
 Focus on extracting concrete, actionable information that would help travelers make informed decisions. Include specific details about crime patterns, safe areas, transportation safety, health precautions, and any special circumstances.
 `;
+
+  console.log(`[DEBUG] Sending prompt to ChatGPT for ${countryName}:`, prompt.substring(0, 500) + '...');
+  console.log(`[DEBUG] Truncated content length for ${countryName}:`, truncatedContent.length);
 
   try {
     const response = await openai.chat.completions.create({
