@@ -294,18 +294,21 @@ Provide a comprehensive analysis in JSON format with:
     const result = JSON.parse(rawContent);
     console.log(`[DEBUG] Parsed ChatGPT result for ${countryName}:`, JSON.stringify(result, null, 2));
     
-    // Validate that required fields are present and meaningful
-    if (!result.summary || result.summary.length < 50) {
-      throw new Error('Invalid summary returned from ChatGPT');
+    // Validate that essential fields are present - be flexible with arrays
+    if (!result.summary || result.summary.length < 20) {
+      console.warn(`[DEBUG] Invalid summary for ${countryName}: too short or missing`);
+      result.summary = originalSummary; // Fallback to original
     }
+    
+    // Log validation warnings but don't throw errors for missing array data
     if (!Array.isArray(result.keyRisks) || result.keyRisks.length < 1) {
-      throw new Error('Invalid keyRisks returned from ChatGPT');
+      console.warn(`[DEBUG] Limited keyRisks for ${countryName}: ${result.keyRisks?.length || 0} items`);
     }
     if (!Array.isArray(result.safetyRecommendations) || result.safetyRecommendations.length < 1) {
-      throw new Error('Invalid safetyRecommendations returned from ChatGPT');
+      console.warn(`[DEBUG] Limited safetyRecommendations for ${countryName}: ${result.safetyRecommendations?.length || 0} items`);
     }
     if (!Array.isArray(result.specificAreas) || result.specificAreas.length < 1) {
-      throw new Error('Invalid specificAreas returned from ChatGPT');
+      console.warn(`[DEBUG] Limited specificAreas for ${countryName}: ${result.specificAreas?.length || 0} items`);
     }
     
     // Validate the response structure

@@ -156,6 +156,7 @@ export class DataFetcher {
       let enhancedData = null;
       if (isAIEnhancementAvailable()) {
         try {
+          console.log(`[DEBUG] Starting AI enhancement for ${countryName}`);
           const enhanced = await enhanceStateDeptSummary(baseSummary, advisoryLink, countryName);
           
           // Always store enhanced data if AI call was successful
@@ -164,18 +165,24 @@ export class DataFetcher {
           // Use enhanced summary if available and different
           if (enhanced.summary && enhanced.summary !== baseSummary) {
             finalSummary = enhanced.summary;
+            console.log(`[DEBUG] Using enhanced summary for ${countryName}`);
           }
           
           // If AI found specific risks, add them to the title
           if (enhanced.keyRisks && enhanced.keyRisks.length > 0) {
             enhancedTitle = `${baseTitle} - ${enhanced.keyRisks.slice(0, 2).join(", ")}`;
+            console.log(`[DEBUG] Enhanced title for ${countryName}: ${enhancedTitle}`);
           }
           
-          console.log(`AI enhancement successful for ${countryName}`);
+          console.log(`[DEBUG] AI enhancement successful for ${countryName} - Summary: ${enhanced.summary?.length || 0} chars, Risks: ${enhanced.keyRisks?.length || 0}, Recommendations: ${enhanced.safetyRecommendations?.length || 0}, Areas: ${enhanced.specificAreas?.length || 0}`);
         } catch (error) {
-          console.warn(`AI enhancement failed for ${countryName}:`, error);
+          console.error(`[ERROR] AI enhancement failed for ${countryName}:`, error);
+          console.error(`[ERROR] Advisory link: ${advisoryLink}`);
+          console.error(`[ERROR] Base summary: ${baseSummary}`);
           // Continue with basic summary
         }
+      } else {
+        console.log(`[DEBUG] AI enhancement not available - missing OPENAI_API_KEY`);
       }
 
       alerts.push({
