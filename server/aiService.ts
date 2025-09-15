@@ -145,15 +145,22 @@ Focus on extracting concrete, actionable information that would help travelers m
       max_completion_tokens: 1000 // GPT-5 uses max_completion_tokens instead of max_tokens
     });
 
-    const result = JSON.parse(response.choices[0].message.content || '{}');
+    const rawContent = response.choices[0].message.content || '{}';
+    console.log(`[DEBUG] ChatGPT raw response for ${countryName}:`, rawContent);
+    
+    const result = JSON.parse(rawContent);
+    console.log(`[DEBUG] Parsed ChatGPT result for ${countryName}:`, JSON.stringify(result, null, 2));
     
     // Validate the response structure
-    return {
+    const processedResult = {
       summary: result.summary || originalSummary,
       keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
       safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
       specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : []
     };
+    
+    console.log(`[DEBUG] Processed result for ${countryName}:`, JSON.stringify(processedResult, null, 2));
+    return processedResult;
 
   } catch (error) {
     console.error('Error analyzing advisory content with OpenAI:', error);
