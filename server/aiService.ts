@@ -26,8 +26,22 @@ export async function enhanceStateDeptSummary(
     console.log(`[DEBUG] Page content preview for ${countryName}:`, pageContent?.substring(0, 200) || 'NO CONTENT');
     
     if (!pageContent) {
-      console.log(`[DEBUG] No page content fetched for ${countryName}, using fallback`);
-      // Fallback to original summary if page fetch fails - NO AI applied
+      console.log(`[DEBUG] No page content fetched for ${countryName}, trying AI analysis of base summary`);
+      // Fallback: Try AI analysis of the base summary when full page isn't available
+      try {
+        if (originalSummary && originalSummary.length > 20) {
+          const enhancedData = await analyzeBaseSummary(originalSummary, countryName);
+          return {
+            ...enhancedData,
+            lastUpdated: new Date().toISOString(),
+            aiApplied: true
+          };
+        }
+      } catch (error) {
+        console.warn(`[DEBUG] Fallback AI analysis failed for ${countryName}:`, error);
+      }
+      
+      // If fallback AI also fails, return original - NO AI applied
       return {
         summary: originalSummary,
         keyRisks: [],
@@ -57,6 +71,76 @@ export async function enhanceStateDeptSummary(
       safetyRecommendations: [],
       specificAreas: [],
       lastUpdated: new Date().toISOString(),
+      aiApplied: false
+    };
+  }
+}
+
+async function analyzeBaseSummary(
+  baseSummary: string, 
+  countryName: string
+): Promise<Omit<EnhancedSummary, 'lastUpdated'>> {
+  console.log(`[DEBUG] Analyzing base summary for ${countryName}: ${baseSummary.substring(0, 100)}...`);
+
+  const prompt = `
+Analyze this US State Department travel advisory summary for ${countryName} and extract key information for travelers.
+
+Travel Advisory Summary: "${baseSummary}"
+
+Based on this summary, provide a JSON response with:
+{
+  "summary": "Expand this summary with 2-3 sentences providing context about travel conditions, safety considerations, and what travelers should know",
+  "keyRisks": ["List 2-4 specific risks that can be inferred from this advisory level and summary"],
+  "safetyRecommendations": ["List 2-4 practical safety recommendations appropriate for this travel advisory level"],
+  "specificAreas": ["List any specific cities, regions, or areas mentioned or commonly relevant for ${countryName}"]
+}
+
+Focus on providing practical, actionable guidance even with limited information.
+`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a travel safety expert. Provide practical travel guidance based on government travel advisories. Respond with valid JSON."
+        },
+        {
+          role: "user", 
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 800
+    });
+
+    const rawContent = response.choices[0].message.content || '{}';
+    console.log(`[DEBUG] Base summary AI response for ${countryName}:`, rawContent);
+    
+    const result = JSON.parse(rawContent);
+    
+    // Validate and structure the response
+    const processedResult = {
+      summary: result.summary || baseSummary,
+      keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
+      safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
+      specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : [],
+      aiApplied: true
+    };
+    
+    console.log(`[DEBUG] Base summary processed result for ${countryName}:`, JSON.stringify(processedResult, null, 2));
+    return processedResult;
+
+  } catch (error) {
+    console.error('Error analyzing base summary with OpenAI:', error);
+    
+    // Return original summary on AI failure
+    return {
+      summary: baseSummary,
+      keyRisks: [],
+      safetyRecommendations: [],
+      specificAreas: [],
       aiApplied: false
     };
   }
