@@ -4,6 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["chromium", "glib", "nss"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -15,8 +16,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 35961
+localPort = 34251
 externalPort = 3000
+
+[[ports]]
+localPort = 41963
+externalPort = 3001
 
 [env]
 PORT = "5000"
