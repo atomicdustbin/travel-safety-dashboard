@@ -259,77 +259,37 @@ Focus on extracting concrete, actionable information that would help travelers m
   console.log(`[DEBUG] Truncated content length for ${countryName}:`, truncatedContent.length);
 
   try {
-    const response = await openai.responses.create({
-      model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-      input: [
+    // Use a working model with structured outputs for reliable results
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // Use gpt-4o-mini which is known to work reliably with structured outputs
+      messages: [
         {
           role: "system",
-          content: "You are a travel safety expert who analyzes government travel advisories. You must respond with valid JSON that matches the required schema exactly."
+          content: "You are a travel safety expert who analyzes government travel advisories. Respond with valid JSON that provides detailed, practical guidance for travelers."
         },
         {
           role: "user", 
-          content: prompt
+          content: `Analyze this US State Department travel advisory for ${countryName} and provide detailed, actionable information.
+
+Original summary: "${originalSummary}"
+
+Full advisory content:
+${truncatedContent}
+
+Provide a comprehensive analysis in JSON format with:
+- summary: A detailed 2-3 paragraph summary that goes beyond just the threat level
+- keyRisks: Array of 3-6 specific risks or threats mentioned  
+- safetyRecommendations: Array of 3-6 specific safety recommendations
+- specificAreas: Array of specific cities, regions, or areas mentioned`
         }
       ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "AdvisoryAnalysis",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              summary: {
-                type: "string",
-                description: "A detailed 2-3 paragraph summary that goes beyond just the threat level, including specific context about current conditions, regional variations, and practical implications for travelers"
-              },
-              keyRisks: {
-                type: "array",
-                description: "List of 3-6 specific risks or threats mentioned, such as crime types, areas to avoid, health concerns, or political situations",
-                items: { type: "string" },
-                minItems: 2
-              },
-              safetyRecommendations: {
-                type: "array", 
-                description: "List of 3-6 specific safety recommendations and precautions travelers should take",
-                items: { type: "string" },
-                minItems: 2
-              },
-              specificAreas: {
-                type: "array",
-                description: "List of specific cities, regions, or areas mentioned in the advisory with particular conditions or recommendations",
-                items: { type: "string" },
-                minItems: 1
-              }
-            },
-            required: ["summary", "keyRisks", "safetyRecommendations", "specificAreas"],
-            additionalProperties: false
-          }
-        }
-      },
-      // GPT-5 only supports default temperature (1), so we don't specify it
-      max_output_tokens: 1000 // Responses API uses max_output_tokens instead of max_completion_tokens
+      response_format: { type: "json_object" },
+      max_tokens: 1000
     });
 
-    // Extract structured JSON content from Responses API output
-    let rawContent = response.output_text || '';
-    
-    // Fallback to response.output[].content[].text if output_text is empty
-    if (!rawContent && response.output && response.output.length > 0) {
-      for (const output of response.output) {
-        if (output.content && output.content.length > 0) {
-          rawContent = output.content[0].text || '';
-          if (rawContent) break;
-        }
-      }
-    }
-    
-    // Final fallback
-    if (!rawContent) {
-      rawContent = '{}';
-    }
-    
-    console.log(`[DEBUG] ChatGPT Responses API output for ${countryName}:`, rawContent);
+    // Extract JSON content from chat completions response
+    const rawContent = response.choices[0].message.content || '{}';
+    console.log(`[DEBUG] ChatGPT response for ${countryName}:`, rawContent);
     
     const result = JSON.parse(rawContent);
     console.log(`[DEBUG] Parsed ChatGPT result for ${countryName}:`, JSON.stringify(result, null, 2));
