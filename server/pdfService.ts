@@ -151,6 +151,42 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
                   </div>
                   <h4 class="alert-title">${escapeHtml(alert.title)}</h4>
                   <p class="alert-summary">${escapeHtml(alert.summary)}</p>
+                  
+                  ${alert.source === "US State Dept" && alert.aiEnhanced && ((alert.keyRisks && alert.keyRisks.length > 0) || (alert.safetyRecommendations && alert.safetyRecommendations.length > 0) || (alert.specificAreas && alert.specificAreas.length > 0)) ? `
+                    <div class="ai-enhanced-section">
+                      <div class="ai-enhanced-header">
+                        <span class="ai-badge">🧠 AI Enhanced Analysis</span>
+                      </div>
+                      
+                      ${alert.keyRisks && alert.keyRisks.length > 0 ? `
+                        <div class="ai-subsection">
+                          <h5 class="ai-subsection-title">⚠️ Key Risks</h5>
+                          <ul class="ai-list">
+                            ${alert.keyRisks.map(risk => `<li>${escapeHtml(risk)}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                      
+                      ${alert.safetyRecommendations && alert.safetyRecommendations.length > 0 ? `
+                        <div class="ai-subsection">
+                          <h5 class="ai-subsection-title">🛡️ Safety Recommendations</h5>
+                          <ul class="ai-list">
+                            ${alert.safetyRecommendations.map(rec => `<li>${escapeHtml(rec)}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                      
+                      ${alert.specificAreas && alert.specificAreas.length > 0 ? `
+                        <div class="ai-subsection">
+                          <h5 class="ai-subsection-title">📍 Specific Areas</h5>
+                          <ul class="ai-list">
+                            ${alert.specificAreas.map(area => `<li>${escapeHtml(area)}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+                  
                   <div class="alert-link">
                     <strong>Full Advisory:</strong> <a href="${escapeHtml(alert.link)}">${escapeHtml(alert.link)}</a>
                   </div>
