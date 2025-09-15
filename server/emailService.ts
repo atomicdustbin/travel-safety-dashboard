@@ -124,7 +124,7 @@ For security reasons, this link will expire in 30 minutes.
 
   return {
     to: recipientEmail,
-    from: 'noreply@global-advisor.com', // You may need to verify this domain with SendGrid
+    from: 'noreply@ofisca.com', // You may need to verify this domain with SendGrid
     subject: 'Reset Your Password - Global Advisor',
     text: textContent,
     html: htmlContent,
@@ -204,7 +204,7 @@ This is a security notification. If you have concerns about your account, please
 
   return {
     to: recipientEmail,
-    from: 'noreply@global-advisor.com',
+    from: 'noreply@ofisca.com',
     subject: 'Password Successfully Reset - Global Advisor',
     text: textContent,
     html: htmlContent,
