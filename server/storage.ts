@@ -33,6 +33,11 @@ export class MemStorage implements IStorage {
     this.backgroundInfo = new Map();
   }
 
+  // Helper to normalize arrays for type safety
+  private toStringArray(v: unknown): string[] | null {
+    return Array.isArray(v) ? (v as unknown[]).map(String) : null;
+  }
+
   async getCountry(id: string): Promise<Country | undefined> {
     return this.countries.get(id);
   }
@@ -74,6 +79,11 @@ export class MemStorage implements IStorage {
       id: randomUUID(),
       level: insertAlert.level || null,
       createdAt: new Date(),
+      // Handle AI enhancement fields with proper typing
+      keyRisks: this.toStringArray(insertAlert.keyRisks),
+      safetyRecommendations: this.toStringArray(insertAlert.safetyRecommendations),
+      specificAreas: this.toStringArray(insertAlert.specificAreas),
+      aiEnhanced: insertAlert.aiEnhanced || null,
     };
     this.alerts.set(alert.id, alert);
     return alert;
@@ -102,7 +112,13 @@ export class MemStorage implements IStorage {
       const updated: BackgroundInfo = {
         ...existingInfo,
         ...insertInfo,
-        languages: Array.isArray(insertInfo.languages) ? insertInfo.languages : null,
+        languages: this.toStringArray(insertInfo.languages),
+        religion: insertInfo.religion ?? null,
+        gdpPerCapita: insertInfo.gdpPerCapita ?? null,
+        population: insertInfo.population ?? null,
+        capital: insertInfo.capital ?? null,
+        currency: insertInfo.currency ?? null,
+        wikiLink: insertInfo.wikiLink ?? null,
         lastUpdated: new Date(),
       };
       this.backgroundInfo.set(existingInfo.id, updated);
@@ -111,7 +127,13 @@ export class MemStorage implements IStorage {
       const info: BackgroundInfo = {
         ...insertInfo,
         id: randomUUID(),
-        languages: Array.isArray(insertInfo.languages) ? insertInfo.languages : null,
+        languages: this.toStringArray(insertInfo.languages),
+        religion: insertInfo.religion ?? null,
+        gdpPerCapita: insertInfo.gdpPerCapita ?? null,
+        population: insertInfo.population ?? null,
+        capital: insertInfo.capital ?? null,
+        currency: insertInfo.currency ?? null,
+        wikiLink: insertInfo.wikiLink ?? null,
         lastUpdated: new Date(),
       };
       this.backgroundInfo.set(info.id, info);
