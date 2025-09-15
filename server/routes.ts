@@ -3,6 +3,18 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
+import { generatePDFReport } from "./pdfService";
+import { type SearchResult } from "@shared/schema";
+import { z } from "zod";
+
+// Validation schemas
+const pdfExportSchema = z.object({
+  countries: z.string().min(1, "Countries parameter is required").transform(str => 
+    str.split(",").map(name => name.trim()).filter(name => name)
+  ).refine(arr => arr.length > 0, {
+    message: "At least one country name is required"
+  })
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Search countries endpoint
@@ -72,6 +84,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Search error:", error);
       res.status(500).json({ error: "Failed to search countries" });
+    }
+  });
+
+  // PDF Export endpoint
+  app.post("/api/export/pdf", async (req, res) => {
+    try {
+      // Validate input using Zod schema
+      const validation = pdfExportSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid input parameters",
+          details: validation.error.errors.map(err => `${err.path.join('.')}: ${err.message}`)
+        });
+      }
+
+      const countryNames = validation.data.countries;
+      const searchQuery = countryNames.join(", ");
+
+      // Validate each country name before processing
+      const validationResults = countryNames.map(countryName => {
+        const validation = dataFetcher.validateCountryName(countryName);
+        return { originalName: countryName, ...validation };
+      });
+
+      // Check for invalid countries
+      const invalidCountries = validationResults.filter(result => !result.isValid);
+      
+      if (invalidCountries.length > 0) {
+        const errorMessages = invalidCountries.map(invalid => {
+          const message = `'${invalid.originalName}' is not a recognized country name`;
+          return invalid.suggestion 
+            ? `${message}. Did you mean '${invalid.suggestion}'?`
+            : message;
+        });
+
+        return res.status(400).json({ 
+          error: "Invalid country names found",
+          details: errorMessages,
+          validCountries: validationResults.filter(r => r.isValid).map(r => r.normalizedName)
+        });
+      }
+
+      // Process only valid countries - reconstruct search results server-side
+      const validCountryNames = validationResults.map(result => result.normalizedName!);
+      
+      const fetchPromises = validCountryNames.map(async (countryName) => {
+        // Add to scheduler refresh list
+        scheduler.addCountryToRefresh(countryName);
+        
+        // Check if we have recent data, if not fetch it
+        const existingData = await storage.getCountryData(countryName);
+        if (!existingData) {
+          await dataFetcher.fetchAllCountryData(countryName);
+        }
+        
+        return storage.getCountryData(countryName);
+      });
+
+      const results = await Promise.all(fetchPromises);
+      const searchResults = results.filter(result => result !== undefined) as SearchResult;
+
+      if (searchResults.length === 0) {
+        return res.status(404).json({ error: "No data found for the specified countries" });
+      }
+      
+      // Generate PDF using server-side data
+      const pdfBuffer = await generatePDFReport(searchResults, searchQuery);
+      
+      // Set response headers for PDF download
+      const filename = `travel-advisory-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("PDF export error:", error);
+      res.status(500).json({ error: "Failed to generate PDF report" });
     }
   });
 

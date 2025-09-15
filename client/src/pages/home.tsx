@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { SearchSection } from "@/components/SearchSection";
 import { CountryCard } from "@/components/CountryCard";
 import { LoadingState } from "@/components/LoadingState";
+import { ExportButton } from "@/components/ExportButton";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Globe, AlertCircle, Search } from "lucide-react";
 import { type SearchResult } from "@shared/schema";
@@ -142,11 +143,27 @@ export default function Home() {
 
         {/* Results */}
         {!isLoading && !error && searchResults.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2" data-testid="search-results">
-            {sortedResults.map((countryData) => (
-              <CountryCard key={countryData.country.id} countryData={countryData} />
-            ))}
-          </div>
+          <>
+            {/* Export Button */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-foreground">
+                  Search Results ({searchResults.length} {searchResults.length === 1 ? 'country' : 'countries'})
+                </h2>
+                <ExportButton
+                  searchResults={searchResults}
+                  searchQuery={searchCountries.join(", ")}
+                />
+              </div>
+            </div>
+            
+            {/* Results Grid */}
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2" data-testid="search-results">
+              {sortedResults.map((countryData) => (
+                <CountryCard key={countryData.country.id} countryData={countryData} />
+              ))}
+            </div>
+          </>
         )}
 
         {/* Empty State */}
