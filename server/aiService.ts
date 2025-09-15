@@ -11,6 +11,7 @@ interface EnhancedSummary {
   safetyRecommendations: string[];
   specificAreas: string[];
   lastUpdated: string;
+  aiApplied: boolean; // Flag to indicate if AI analysis actually occurred
 }
 
 export async function enhanceStateDeptSummary(
@@ -26,13 +27,14 @@ export async function enhanceStateDeptSummary(
     
     if (!pageContent) {
       console.log(`[DEBUG] No page content fetched for ${countryName}, using fallback`);
-      // Fallback to original summary if page fetch fails
+      // Fallback to original summary if page fetch fails - NO AI applied
       return {
         summary: originalSummary,
         keyRisks: [],
         safetyRecommendations: [],
         specificAreas: [],
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        aiApplied: false
       };
     }
 
@@ -42,18 +44,20 @@ export async function enhanceStateDeptSummary(
     return {
       ...enhancedData,
       lastUpdated: new Date().toISOString()
+      // aiApplied is already correctly set in enhancedData - don't override it
     };
 
   } catch (error) {
     console.error('Error enhancing State Dept summary:', error);
     
-    // Return original summary on error
+    // Return original summary on error - NO AI applied
     return {
       summary: originalSummary,
       keyRisks: [],
       safetyRecommendations: [],
       specificAreas: [],
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      aiApplied: false
     };
   }
 }
@@ -316,7 +320,8 @@ Provide a comprehensive analysis in JSON format with:
       summary: result.summary || originalSummary,
       keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
       safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
-      specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : []
+      specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : [],
+      aiApplied: true // AI analysis was successfully applied
     };
     
     console.log(`[DEBUG] Processed result for ${countryName}:`, JSON.stringify(processedResult, null, 2));
@@ -325,12 +330,13 @@ Provide a comprehensive analysis in JSON format with:
   } catch (error) {
     console.error('Error analyzing advisory content with OpenAI:', error);
     
-    // Return minimal enhancement on AI failure
+    // Return original summary on AI failure - NO AI applied, no user-facing error message
     return {
-      summary: originalSummary + " (Enhanced analysis temporarily unavailable)",
+      summary: originalSummary,
       keyRisks: [],
       safetyRecommendations: [],
-      specificAreas: []
+      specificAreas: [],
+      aiApplied: false
     };
   }
 }

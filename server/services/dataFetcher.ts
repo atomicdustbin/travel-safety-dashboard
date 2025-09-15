@@ -198,7 +198,7 @@ export class DataFetcher {
         keyRisks: enhancedData?.keyRisks || null,
         safetyRecommendations: enhancedData?.safetyRecommendations || null,
         specificAreas: enhancedData?.specificAreas || null,
-        aiEnhanced: enhancedData ? new Date() : null,
+        aiEnhanced: (enhancedData?.aiApplied) ? new Date() : null,
       });
 
       return alerts;
