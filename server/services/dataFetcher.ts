@@ -157,9 +157,13 @@ export class DataFetcher {
       if (isAIEnhancementAvailable()) {
         try {
           const enhanced = await enhanceStateDeptSummary(baseSummary, advisoryLink, countryName);
+          
+          // Always store enhanced data if AI call was successful
+          enhancedData = enhanced;
+          
+          // Use enhanced summary if available and different
           if (enhanced.summary && enhanced.summary !== baseSummary) {
             finalSummary = enhanced.summary;
-            enhancedData = enhanced;
           }
           
           // If AI found specific risks, add them to the title
