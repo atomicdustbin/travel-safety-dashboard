@@ -120,12 +120,28 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         </div>
         
         <div class="country-header">
-          <h2 class="country-name">${escapeHtml(country.name.charAt(0).toUpperCase() + country.name.slice(1))}</h2>
-          <div class="country-code">${escapeHtml(country.code)}</div>
+          <div class="country-header-content">
+            ${country.flagUrl ? `
+              <img src="${escapeHtml(country.flagUrl)}" alt="${escapeHtml(country.name)} flag" class="country-flag" />
+            ` : `
+              <div class="country-flag-placeholder">🌍</div>
+            `}
+            <div class="country-text">
+              <h2 class="country-name">${escapeHtml(country.name.charAt(0).toUpperCase() + country.name.slice(1))}</h2>
+              <div class="country-code">${escapeHtml(country.code)}</div>
+            </div>
+          </div>
         </div>
 
         <div class="section">
-          <h3 class="section-title">🚨 Current Alerts</h3>
+          <h3 class="section-title">
+            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <path d="M12 9v4"/>
+              <path d="m12 17 .01 0"/>
+            </svg>
+            Current Alerts
+          </h3>
           ${alerts.length > 0 ? `
             <div class="alerts-container">
               ${alerts.map(alert => `
@@ -147,12 +163,32 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
                   ${alert.source === "US State Dept" && alert.aiEnhanced && ((alert.keyRisks && alert.keyRisks.length > 0) || (alert.safetyRecommendations && alert.safetyRecommendations.length > 0) || (alert.specificAreas && alert.specificAreas.length > 0)) ? `
                     <div class="ai-enhanced-section">
                       <div class="ai-enhanced-header">
-                        <span class="ai-badge">🧠 AI Enhanced Analysis</span>
+                        <span class="ai-badge">
+                          <svg class="ai-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+                            <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+                            <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+                            <path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/>
+                            <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/>
+                            <path d="M3.477 10.896a4 4 0 0 1 .585-.396"/>
+                            <path d="M19.938 10.5a4 4 0 0 1 .585.396"/>
+                            <path d="M6 18a4 4 0 0 1-1.967-.516"/>
+                            <path d="M19.967 17.484A4 4 0 0 1 18 18"/>
+                          </svg>
+                          AI Enhanced Analysis
+                        </span>
                       </div>
                       
                       ${alert.keyRisks && alert.keyRisks.length > 0 ? `
                         <div class="ai-subsection">
-                          <h5 class="ai-subsection-title">⚠️ Key Risks</h5>
+                          <h5 class="ai-subsection-title">
+                            <svg class="subsection-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                              <path d="M12 9v4"/>
+                              <path d="m12 17 .01 0"/>
+                            </svg>
+                            Key Risks
+                          </h5>
                           <ul class="ai-list">
                             ${alert.keyRisks.map(risk => `<li>${escapeHtml(risk)}</li>`).join('')}
                           </ul>
@@ -161,7 +197,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
                       
                       ${alert.safetyRecommendations && alert.safetyRecommendations.length > 0 ? `
                         <div class="ai-subsection">
-                          <h5 class="ai-subsection-title">🛡️ Safety Recommendations</h5>
+                          <h5 class="ai-subsection-title">
+                            <svg class="subsection-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+                              <path d="m9 12 2 2 4-4"/>
+                            </svg>
+                            Safety Recommendations
+                          </h5>
                           <ul class="ai-list">
                             ${alert.safetyRecommendations.map(rec => `<li>${escapeHtml(rec)}</li>`).join('')}
                           </ul>
@@ -170,7 +212,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
                       
                       ${alert.specificAreas && alert.specificAreas.length > 0 ? `
                         <div class="ai-subsection">
-                          <h5 class="ai-subsection-title">📍 Specific Areas</h5>
+                          <h5 class="ai-subsection-title">
+                            <svg class="subsection-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                              <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                            Specific Areas
+                          </h5>
                           <ul class="ai-list">
                             ${alert.specificAreas.map(area => `<li>${escapeHtml(area)}</li>`).join('')}
                           </ul>
@@ -191,7 +239,16 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         </div>
 
         <div class="section">
-          <h3 class="section-title">📋 Background Information</h3>
+          <h3 class="section-title">
+            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+              <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+              <path d="M10 9H8"/>
+              <path d="M16 13H8"/>
+              <path d="M16 17H8"/>
+            </svg>
+            Background Information
+          </h3>
           ${background ? `
             <div class="background-grid">
               <div class="background-item">
@@ -305,15 +362,42 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         }
         
         .country-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
           padding: 20px;
           background: #f9fafb;
           border: 1px solid #e5e7eb;
           border-top: none;
           border-radius: 0 0 8px 8px;
           margin-bottom: 20px;
+        }
+        
+        .country-header-content {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+        
+        .country-flag {
+          width: 32px;
+          height: 24px;
+          border-radius: 4px;
+          border: 1px solid #e5e7eb;
+          object-fit: cover;
+        }
+        
+        .country-flag-placeholder {
+          width: 32px;
+          height: 24px;
+          border-radius: 4px;
+          border: 1px solid #e5e7eb;
+          background: #f3f4f6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+        
+        .country-text {
+          flex: 1;
         }
         
         .country-name {
@@ -340,6 +424,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           margin-bottom: 15px;
           padding-bottom: 5px;
           border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .section-icon {
+          color: #2563eb;
         }
         
         .alerts-container {
@@ -460,6 +551,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           border-radius: 4px;
           font-size: 11px;
           font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        
+        .ai-icon {
+          color: #2563eb;
         }
         
         .ai-subsection {
@@ -475,6 +573,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           font-size: 14px;
           font-weight: 600;
           margin-bottom: 5px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        
+        .subsection-icon {
+          color: #1e40af;
         }
         
         .ai-list {
