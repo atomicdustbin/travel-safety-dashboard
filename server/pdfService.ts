@@ -106,15 +106,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
     return levelMatch ? parseInt(levelMatch[1]) : null;
   };
 
-  const getSeverityBadgeColor = (severity: string) => {
-    switch (severity) {
-      case 'high': return '#dc2626';
-      case 'medium': return '#f97316';
-      case 'low': return '#16a34a';
-      case 'info': return '#2563eb';
-      default: return '#6b7280';
-    }
-  };
+  // Removed getSeverityBadgeColor function - using clean styling without background colors
 
   const countriesHTML = searchResults.map(countryData => {
     const { country, alerts, background } = countryData;
@@ -139,12 +131,12 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
               ${alerts.map(alert => `
                 <div class="alert-item">
                   <div class="alert-header">
-                    <span class="source-badge" style="background-color: ${getSeverityBadgeColor(alert.severity)};">
+                    <span class="source-badge">
                       ${escapeHtml(alert.source)}
                     </span>
                     <span class="alert-date">${new Date(alert.date).toLocaleDateString()}</span>
                     ${alert.level ? `
-                      <span class="level-badge" style="background-color: ${getSeverityBadgeColor(alert.severity)};">
+                      <span class="level-badge">
                         ${escapeHtml(alert.level)}
                       </span>
                     ` : ''}
@@ -359,7 +351,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           border-radius: 8px;
           padding: 15px;
           margin-bottom: 15px;
-          background: #fafafa;
+          background: white;
         }
         
         .alert-header {
@@ -371,11 +363,13 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         }
         
         .source-badge, .level-badge {
-          color: white;
+          color: #374151;
           padding: 4px 8px;
+          border: 1px solid #d1d5db;
           border-radius: 4px;
           font-size: 12px;
           font-weight: 500;
+          background: white;
         }
         
         .alert-date {
@@ -387,6 +381,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
           font-weight: bold;
           margin-bottom: 8px;
           color: #1f2937;
+          font-size: 14px;
         }
         
         .alert-summary {
@@ -447,10 +442,9 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         
         /* AI Enhancement Section Styles */
         .ai-enhanced-section {
-          background: #f0f9ff;
-          border: 1px solid #bae6fd;
-          border-radius: 6px;
-          padding: 12px;
+          background: white;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 12px;
           margin: 10px 0;
         }
         
@@ -459,9 +453,10 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         }
         
         .ai-badge {
-          background: #2563eb;
-          color: white;
+          background: white;
+          color: #374151;
           padding: 4px 8px;
+          border: 1px solid #d1d5db;
           border-radius: 4px;
           font-size: 11px;
           font-weight: 600;

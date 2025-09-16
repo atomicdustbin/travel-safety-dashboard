@@ -55,33 +55,13 @@ export function CountryCard({ countryData }: CountryCardProps) {
   const threatLevel = getStateDeptThreatLevel();
 
   const getSeverityClass = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-red-50 border-red-200 text-red-800";
-      case "medium":
-        return "bg-orange-50 border-orange-200 text-orange-800";
-      case "low":
-        return "bg-green-50 border-green-200 text-green-800";
-      case "info":
-        return "bg-blue-50 border-blue-200 text-blue-800";
-      default:
-        return "bg-gray-50 border-gray-200 text-gray-800";
-    }
+    // Simplified styling without background colors for cleaner look
+    return "border border-gray-200 text-foreground";
   };
 
   const getSeverityBadgeClass = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-red-100 text-red-800";
-      case "medium":
-        return "bg-orange-100 text-orange-800";
-      case "low":
-        return "bg-green-100 text-green-800";
-      case "info":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    // Simplified badge styling without background colors for cleaner look
+    return "border border-gray-300 text-foreground bg-background";
   };
 
   return (
@@ -98,7 +78,7 @@ export function CountryCard({ countryData }: CountryCardProps) {
       
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-foreground capitalize" data-testid={`text-country-name-${country.id}`}>
+          <h3 className="text-lg font-semibold text-foreground capitalize" data-testid={`text-country-name-${country.id}`}>
             {country.name}
           </h3>
           <div className="flex items-center space-x-2">
@@ -158,7 +138,7 @@ export function CountryCard({ countryData }: CountryCardProps) {
                       </Badge>
                     )}
                   </div>
-                  <h5 className="font-medium mb-1" data-testid={`text-alert-title-${country.id}-${index}`}>
+                  <h5 className="text-sm font-medium mb-1" data-testid={`text-alert-title-${country.id}-${index}`}>
                     {alert.title}
                   </h5>
                   <p className="text-sm mb-2" data-testid={`text-alert-summary-${country.id}-${index}`}>
@@ -170,7 +150,7 @@ export function CountryCard({ countryData }: CountryCardProps) {
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <div className="flex items-center mb-2">
                         <Brain className="w-4 h-4 mr-1 text-blue-600" />
-                        <span className="text-xs font-medium text-blue-800 bg-blue-50 px-2 py-1 rounded">
+                        <span className="text-xs font-medium text-foreground border border-gray-300 px-2 py-1 rounded">
                           AI Enhanced Analysis
                         </span>
                       </div>
