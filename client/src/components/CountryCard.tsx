@@ -159,9 +159,9 @@ export function CountryCard({ countryData }: CountryCardProps) {
                         <div className="mb-3">
                           <div className="flex items-center mb-1">
                             <AlertTriangle className="w-3 h-3 mr-1 text-red-500" />
-                            <span className="text-xs font-semibold text-gray-700">Key Risks</span>
+                            <span className="text-sm font-semibold text-gray-700">Key Risks</span>
                           </div>
-                          <ul className="text-xs text-gray-600 ml-4 space-y-0.5">
+                          <ul className="text-sm text-gray-600 ml-4 space-y-0.5">
                             {alert.keyRisks.slice(0, 4).map((risk, riskIndex) => (
                               <li key={riskIndex} className="list-disc" data-testid={`text-risk-${country.id}-${index}-${riskIndex}`}>
                                 {risk}
@@ -175,9 +175,9 @@ export function CountryCard({ countryData }: CountryCardProps) {
                         <div className="mb-3">
                           <div className="flex items-center mb-1">
                             <Shield className="w-3 h-3 mr-1 text-green-500" />
-                            <span className="text-xs font-semibold text-gray-700">Safety Recommendations</span>
+                            <span className="text-sm font-semibold text-gray-700">Safety Recommendations</span>
                           </div>
-                          <ul className="text-xs text-gray-600 ml-4 space-y-0.5">
+                          <ul className="text-sm text-gray-600 ml-4 space-y-0.5">
                             {alert.safetyRecommendations.slice(0, 4).map((rec, recIndex) => (
                               <li key={recIndex} className="list-disc" data-testid={`text-recommendation-${country.id}-${index}-${recIndex}`}>
                                 {rec}
@@ -191,9 +191,9 @@ export function CountryCard({ countryData }: CountryCardProps) {
                         <div className="mb-2">
                           <div className="flex items-center mb-1">
                             <MapPin className="w-3 h-3 mr-1 text-purple-500" />
-                            <span className="text-xs font-semibold text-gray-700">Specific Areas</span>
+                            <span className="text-sm font-semibold text-gray-700">Specific Areas</span>
                           </div>
-                          <p className="text-xs text-gray-600 ml-4" data-testid={`text-areas-${country.id}-${index}`}>
+                          <p className="text-sm text-gray-600 ml-4" data-testid={`text-areas-${country.id}-${index}`}>
                             {alert.specificAreas.slice(0, 5).join(", ")}
                           </p>
                         </div>

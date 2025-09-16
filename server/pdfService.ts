@@ -472,7 +472,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         
         .ai-subsection-title {
           color: #1e40af;
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 600;
           margin-bottom: 5px;
         }
@@ -480,7 +480,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         .ai-list {
           margin: 0;
           padding-left: 15px;
-          font-size: 12px;
+          font-size: 14px;
           color: #374151;
           line-height: 1.4;
         }
