@@ -175,16 +175,6 @@ class BulkDownloadService {
       throw new Error('A bulk download job is already running. Please wait for it to complete.');
     }
 
-    // Prevent duplicate runs on the same day (check database instead of memory)
-    const today = new Date().toISOString().split('T')[0];
-    const lastRunDate = await storage.getLastRunDate();
-    if (lastRunDate) {
-      const lastRunDay = lastRunDate.toISOString().split('T')[0];
-      if (lastRunDay === today) {
-        throw new Error('A bulk download has already been initiated today. Please try again tomorrow.');
-      }
-    }
-
     const jobId = this.generateJobId();
     const countries = this.getValidCountries();
 
