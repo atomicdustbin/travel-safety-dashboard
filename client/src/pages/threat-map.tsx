@@ -169,7 +169,7 @@ export default function ThreatMap() {
 
   return (
     <div className="flex flex-col h-screen bg-background" data-testid="page-threat-map">
-      <header className="bg-card border-b border-border shadow-sm">
+      <header className="bg-card border-b border-border shadow-sm relative z-[1001]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-2">
