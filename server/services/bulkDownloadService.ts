@@ -108,10 +108,11 @@ class BulkDownloadService {
       throw new Error('A bulk download job is already running. Please wait for it to complete.');
     }
 
-    // Prevent duplicate runs on the same day (additional guard for scheduler)
+    // Prevent duplicate runs on the same day (check database instead of memory)
     const today = new Date().toISOString().split('T')[0];
-    if (this.lastRunDate) {
-      const lastRunDay = this.lastRunDate.toISOString().split('T')[0];
+    const lastRunDate = await storage.getLastRunDate();
+    if (lastRunDate) {
+      const lastRunDay = lastRunDate.toISOString().split('T')[0];
       if (lastRunDay === today) {
         throw new Error('A bulk download has already been initiated today. Please try again tomorrow.');
       }
@@ -163,9 +164,6 @@ class BulkDownloadService {
       progress.status = 'failed';
       progress.completedAt = new Date();
       
-      // Clear lastRunDate to allow retry on failure
-      this.lastRunDate = null;
-      
       // Update database with failure status
       try {
         await storage.updateBulkJob(jobId, {
@@ -200,8 +198,6 @@ class BulkDownloadService {
         // Check for cancellation (status already updated by cancelJob)
         if (progress.status === 'cancelled') {
           console.log(`[BulkDownload] Job ${jobId} cancelled, exiting processing loop`);
-          // Clear lastRunDate to allow retry after cancellation
-          this.lastRunDate = null;
           // Cancellation was already persisted by cancelJob, just exit
           return;
         }
@@ -212,25 +208,29 @@ class BulkDownloadService {
         try {
           // Download and enhance advisory for this country
           await this.downloadCountryAdvisory(country);
+          
+          // Use transactional update for atomicity
+          await storage.updateJobWithTransaction(jobId, country, 'completed');
+          
+          // Update in-memory progress for UI/API
           progress.processedCountries++;
         } catch (error) {
           console.error(`[BulkDownload] Failed to process ${country}:`, error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // Use transactional update for atomicity
+          try {
+            await storage.updateJobWithTransaction(jobId, country, 'failed', errorMessage);
+          } catch (txError) {
+            console.error('[BulkDownload] Failed to update job transaction:', txError);
+          }
+          
+          // Update in-memory progress for UI/API
           progress.failedCountries++;
           progress.errors.push({
             country,
-            error: error instanceof Error ? error.message : String(error)
+            error: errorMessage
           });
-        }
-
-        // Update job in database
-        try {
-          await storage.updateBulkJob(jobId, {
-            processedCountries: progress.processedCountries,
-            failedCountries: progress.failedCountries,
-            errorLog: progress.errors
-          });
-        } catch (error) {
-          console.error('[BulkDownload] Failed to update job in database:', error);
         }
 
         // Delay before next country to avoid rate limiting
@@ -244,18 +244,16 @@ class BulkDownloadService {
       progress.completedAt = new Date();
       progress.currentCountry = null;
 
-      // Update lastRunDate only on successful completion to prevent daily duplicates
-      this.lastRunDate = new Date();
-
       console.log(`[BulkDownload] Job ${jobId} completed successfully - Processed: ${progress.processedCountries}, Failed: ${progress.failedCountries}`);
 
-      // Update final job status in database
+      // Update final job status in database with lastRunDate for deduplication
       await storage.updateBulkJob(jobId, {
         status: 'completed',
         completedAt: progress.completedAt,
         processedCountries: progress.processedCountries,
         failedCountries: progress.failedCountries,
-        errorLog: progress.errors
+        errorLog: progress.errors,
+        lastRunDate: new Date(), // Store in database instead of memory
       });
     } catch (error) {
       // Handle any unexpected errors during processing
@@ -263,9 +261,6 @@ class BulkDownloadService {
       progress.status = 'failed';
       progress.completedAt = new Date();
       progress.currentCountry = null;
-      
-      // Clear lastRunDate to allow retry after failure
-      this.lastRunDate = null;
       
       // Add system error to error log
       progress.errors.push({
