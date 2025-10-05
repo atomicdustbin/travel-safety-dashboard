@@ -241,7 +241,7 @@ export default function CountryList() {
                         />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium" data-testid={`text-name-${item.country.id}`}>
+                    <TableCell className="font-medium capitalize" data-testid={`text-name-${item.country.id}`}>
                       {item.country.name}
                     </TableCell>
                     <TableCell data-testid={`text-threat-${item.country.id}`}>
