@@ -13,6 +13,7 @@ interface EnhancedSummary {
   keyRisks: string[];
   safetyRecommendations: string[];
   specificAreas: string[];
+  threatLevel?: number; // 1-4, extracted from the advisory if available
   lastUpdated: string;
   aiApplied: boolean; // Flag to indicate if AI analysis actually occurred
 }
@@ -321,6 +322,7 @@ ${truncatedContent}
 
 Please provide a comprehensive analysis in JSON format with these fields:
 {
+  "threatLevel": 1-4 (IMPORTANT: Extract the exact threat level number from the advisory. Look for phrases like "Level 1", "Level 2", "Level 3", or "Level 4" in the content. Return as a number 1-4. If not found, omit this field),
   "summary": "A detailed 2-3 paragraph summary that goes beyond just the threat level, including specific context about current conditions, regional variations, and practical implications for travelers",
   "keyRisks": ["List of 4-6 specific risks or threats mentioned, such as crime types, areas to avoid, health concerns, or political situations"],
   "safetyRecommendations": ["List of 4-6 specific safety recommendations and precautions travelers should take"],
@@ -350,6 +352,7 @@ Full advisory content:
 ${truncatedContent}
 
 Provide a comprehensive analysis in JSON format with:
+- threatLevel: IMPORTANT: Extract the exact threat level number (1-4) from the advisory. Look for "Level 1", "Level 2", "Level 3", or "Level 4" in the content. Return as a number. If not found, omit this field.
 - summary: A detailed 2-3 paragraph summary that goes beyond just the threat level
 - keyRisks: Array of 3-6 specific risks or threats mentioned  
 - safetyRecommendations: Array of 3-6 specific safety recommendations
@@ -372,12 +375,20 @@ Provide a comprehensive analysis in JSON format with:
       result.summary = originalSummary; // Fallback to original
     }
     
+    // Validate threat level if provided
+    const extractedThreatLevel = typeof result.threatLevel === 'number' && 
+                                  result.threatLevel >= 1 && 
+                                  result.threatLevel <= 4 
+                                    ? result.threatLevel 
+                                    : undefined;
+    
     // Return structured result
     return {
       summary: result.summary || originalSummary,
       keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
       safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
       specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : [],
+      threatLevel: extractedThreatLevel,
       aiApplied: true // AI analysis was successfully applied
     };
 

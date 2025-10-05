@@ -151,15 +151,17 @@ export class DataFetcher {
       const country = await storage.getCountryByName(countryName);
       if (!country) return alerts;
 
-      // Create the basic advisory structure
-      const advisoryLevel = this.getDefaultAdvisoryLevel(countryName);
-      const baseTitle = `Travel Advisory - Level ${advisoryLevel}`;
-      const baseSummary = `Exercise ${advisoryLevel === 4 ? 'extreme' : advisoryLevel === 3 ? 'increased' : advisoryLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`;
+      // Create the basic advisory structure with default level
+      const defaultLevel = this.getDefaultAdvisoryLevel(countryName);
       const advisoryLink = `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatStateDeptUrlSlug(countryName)}-travel-advisory.html`;
 
+      // Start with default level, will be updated by AI if available
+      let finalAdvisoryLevel = defaultLevel;
+      const baseSummary = `Exercise ${defaultLevel === 4 ? 'extreme' : defaultLevel === 3 ? 'increased' : defaultLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`;
+      
       // Enhanced summary using AI if available
       let finalSummary = baseSummary;
-      let enhancedTitle = baseTitle;
+      let finalTitle = `Travel Advisory - Level ${finalAdvisoryLevel}`;
       
       let enhancedData = null;
       if (isAIEnhancementAvailable()) {
@@ -169,6 +171,12 @@ export class DataFetcher {
           // Always store enhanced data if AI call was successful
           enhancedData = enhanced;
           
+          // Use AI-extracted threat level if available, otherwise keep default
+          if (enhanced.threatLevel && enhanced.threatLevel >= 1 && enhanced.threatLevel <= 4) {
+            finalAdvisoryLevel = enhanced.threatLevel;
+            finalTitle = `Travel Advisory - Level ${finalAdvisoryLevel}`;
+          }
+          
           // Use enhanced summary if available and different
           if (enhanced.summary && enhanced.summary !== baseSummary) {
             finalSummary = enhanced.summary;
@@ -176,20 +184,20 @@ export class DataFetcher {
           
           // If AI found specific risks, add them to the title
           if (enhanced.keyRisks && enhanced.keyRisks.length > 0) {
-            enhancedTitle = `${baseTitle} - ${enhanced.keyRisks.slice(0, 2).join(", ")}`;
+            finalTitle = `${finalTitle} - ${enhanced.keyRisks.slice(0, 2).join(", ")}`;
           }
         } catch (error) {
           console.error(`[ERROR] AI enhancement failed for ${countryName}:`, error);
-          // Continue with basic summary
+          // Continue with default level and basic summary
         }
       }
 
       alerts.push({
         countryId: country.id,
         source: "US State Dept",
-        title: enhancedTitle,
-        level: `Level ${advisoryLevel}`,
-        severity: this.mapStateDeptSeverity(advisoryLevel),
+        title: finalTitle,
+        level: `Level ${finalAdvisoryLevel}`,
+        severity: this.mapStateDeptSeverity(finalAdvisoryLevel),
         summary: finalSummary,
         link: advisoryLink,
         date: new Date(),
