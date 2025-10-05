@@ -1,6 +1,6 @@
 import { type Country, type Alert, type BackgroundInfo, type BulkJob, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type CountryData, countries, alerts, backgroundInfo, bulkJobs } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { db } from "./db";
+import { waitForDb, getDatabaseStatus } from "./db";
 import { eq, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -233,13 +233,19 @@ export class MemStorage implements IStorage {
 }
 
 export class DBStorage implements IStorage {
+  private db: NonNullable<Awaited<ReturnType<typeof waitForDb>>>;
+
+  constructor(dbInstance: NonNullable<Awaited<ReturnType<typeof waitForDb>>>) {
+    this.db = dbInstance;
+  }
+
   async getCountry(id: string): Promise<Country | undefined> {
-    const result = await db.select().from(countries).where(eq(countries.id, id)).limit(1);
+    const result = await this.db.select().from(countries).where(eq(countries.id, id)).limit(1);
     return result[0];
   }
 
   async getCountryByName(name: string): Promise<Country | undefined> {
-    const result = await db.select().from(countries).where(eq(countries.name, name)).limit(1);
+    const result = await this.db.select().from(countries).where(eq(countries.name, name)).limit(1);
     return result[0];
   }
 
@@ -249,7 +255,7 @@ export class DBStorage implements IStorage {
       flagUrl: insertCountry.flagUrl || null,
       lastUpdated: new Date(),
     };
-    await db.insert(countries).values(country).onConflictDoUpdate({
+    await this.db.insert(countries).values(country).onConflictDoUpdate({
       target: countries.id,
       set: { ...country, lastUpdated: new Date() }
     });
@@ -257,7 +263,7 @@ export class DBStorage implements IStorage {
   }
 
   async updateCountry(id: string, updates: Partial<Country>): Promise<Country | undefined> {
-    const result = await db.update(countries)
+    const result = await this.db.update(countries)
       .set({ ...updates, lastUpdated: new Date() })
       .where(eq(countries.id, id))
       .returning();
@@ -265,25 +271,25 @@ export class DBStorage implements IStorage {
   }
 
   async getAlertsByCountryId(countryId: string): Promise<Alert[]> {
-    return await db.select().from(alerts).where(eq(alerts.countryId, countryId));
+    return await this.db.select().from(alerts).where(eq(alerts.countryId, countryId));
   }
 
   async createAlert(insertAlert: InsertAlert): Promise<Alert> {
-    const result = await db.insert(alerts).values([insertAlert as any]).returning();
+    const result = await this.db.insert(alerts).values([insertAlert as any]).returning();
     return result[0];
   }
 
   async deleteAlertsByCountryId(countryId: string): Promise<void> {
-    await db.delete(alerts).where(eq(alerts.countryId, countryId));
+    await this.db.delete(alerts).where(eq(alerts.countryId, countryId));
   }
 
   async getBackgroundInfoByCountryId(countryId: string): Promise<BackgroundInfo | undefined> {
-    const result = await db.select().from(backgroundInfo).where(eq(backgroundInfo.countryId, countryId)).limit(1);
+    const result = await this.db.select().from(backgroundInfo).where(eq(backgroundInfo.countryId, countryId)).limit(1);
     return result[0];
   }
 
   async createOrUpdateBackgroundInfo(insertInfo: InsertBackgroundInfo): Promise<BackgroundInfo> {
-    const result = await db.insert(backgroundInfo).values([insertInfo as any]).onConflictDoUpdate({
+    const result = await this.db.insert(backgroundInfo).values([insertInfo as any]).onConflictDoUpdate({
       target: backgroundInfo.countryId,
       set: insertInfo as any
     }).returning();
@@ -308,7 +314,7 @@ export class DBStorage implements IStorage {
 
   async searchCountries(countryNames: string[]): Promise<CountryData[]> {
     const uniqueNames = Array.from(new Set(countryNames));
-    const countriesResults = await db.select().from(countries).where(
+    const countriesResults = await this.db.select().from(countries).where(
       inArray(countries.name, uniqueNames)
     );
 
@@ -330,7 +336,7 @@ export class DBStorage implements IStorage {
   }
 
   async getAllCountriesWithData(): Promise<CountryData[]> {
-    const allCountries = await db.select().from(countries);
+    const allCountries = await this.db.select().from(countries);
     const results: CountryData[] = [];
 
     for (const country of allCountries) {
@@ -350,17 +356,17 @@ export class DBStorage implements IStorage {
   }
 
   async getBulkJob(id: string): Promise<BulkJob | undefined> {
-    const result = await db.select().from(bulkJobs).where(eq(bulkJobs.id, id)).limit(1);
+    const result = await this.db.select().from(bulkJobs).where(eq(bulkJobs.id, id)).limit(1);
     return result[0];
   }
 
   async createBulkJob(insertJob: InsertBulkJob): Promise<BulkJob> {
-    const result = await db.insert(bulkJobs).values([insertJob as any]).returning();
+    const result = await this.db.insert(bulkJobs).values([insertJob as any]).returning();
     return result[0];
   }
 
   async updateBulkJob(id: string, updates: Partial<BulkJob>): Promise<BulkJob | undefined> {
-    const result = await db.update(bulkJobs)
+    const result = await this.db.update(bulkJobs)
       .set(updates)
       .where(eq(bulkJobs.id, id))
       .returning();
@@ -368,7 +374,7 @@ export class DBStorage implements IStorage {
   }
 
   async getAllBulkJobs(limit?: number): Promise<BulkJob[]> {
-    const query = db.select().from(bulkJobs).orderBy(bulkJobs.startedAt);
+    const query = this.db.select().from(bulkJobs).orderBy(bulkJobs.startedAt);
     if (limit) {
       return await query.limit(limit);
     }
@@ -376,4 +382,42 @@ export class DBStorage implements IStorage {
   }
 }
 
-export const storage = process.env.DATABASE_URL ? new DBStorage() : new MemStorage();
+// Initialize storage with database status check
+async function initializeStorage(): Promise<IStorage> {
+  const db = await waitForDb();
+  const dbStatus = getDatabaseStatus();
+  
+  if (dbStatus.hasConnection && db) {
+    console.log('💾 Using PostgreSQL database storage');
+    return new DBStorage(db);
+  } else {
+    if (dbStatus.status === 'failed') {
+      console.warn('⚠️  Database connection failed, falling back to in-memory storage');
+      console.warn('⚠️  Error:', dbStatus.error);
+    }
+    console.log('💾 Using in-memory storage (data will be lost on restart)');
+    return new MemStorage();
+  }
+}
+
+// Storage instance that will be initialized asynchronously
+let storageInstance: IStorage | null = null;
+const storagePromise = initializeStorage().then(s => {
+  storageInstance = s;
+  return s;
+});
+
+// Export a getter that ensures storage is initialized
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get(target, prop) {
+    if (!storageInstance) {
+      throw new Error('Storage not yet initialized. Ensure you await server startup.');
+    }
+    return (storageInstance as any)[prop];
+  }
+});
+
+// Export function to wait for storage initialization
+export async function waitForStorage() {
+  return storagePromise;
+}

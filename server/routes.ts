@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, waitForStorage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
 import { bulkDownloadService } from "./services/bulkDownloadService";
@@ -18,6 +18,8 @@ const pdfExportSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Wait for storage to be initialized before registering routes
+  await waitForStorage();
   // Search countries endpoint
   app.get("/api/search", async (req, res) => {
     const startTime = Date.now();
