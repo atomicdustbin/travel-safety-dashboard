@@ -16,8 +16,10 @@ export interface BulkDownloadProgress {
 
 class BulkDownloadService {
   private activeJobs: Map<string, BulkDownloadProgress> = new Map();
-  private readonly DELAY_BETWEEN_COUNTRIES = 2000; // 2 seconds delay
+  private readonly DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+  private readonly BATCH_SIZE = 5; // Process 5 countries concurrently
   private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY_MS = 2000; // Base delay for retries
   private lastRunDate: Date | null = null; // Track last run to prevent duplicates
   private initialized = false;
 
@@ -250,7 +252,7 @@ class BulkDownloadService {
   }
 
   /**
-   * Process all countries sequentially with delays
+   * Process all countries in batches with concurrency
    */
   private async processCountries(jobId: string, countries: string[]): Promise<void> {
     const progress = this.activeJobs.get(jobId);
@@ -259,48 +261,25 @@ class BulkDownloadService {
     }
 
     try {
-      for (const country of countries) {
-        // Check for cancellation (status already updated by cancelJob)
+      // Process countries in batches for controlled concurrency
+      for (let i = 0; i < countries.length; i += this.BATCH_SIZE) {
+        // Check for cancellation before each batch
         if (progress.status === 'cancelled') {
           console.log(`[BulkDownload] Job ${jobId} cancelled, exiting processing loop`);
-          // Cancellation was already persisted by cancelJob, just exit
           return;
         }
 
-        progress.currentCountry = country;
-        console.log(`[BulkDownload] Processing ${country} (${progress.processedCountries + 1}/${progress.totalCountries})`);
+        const batch = countries.slice(i, i + this.BATCH_SIZE);
+        console.log(`[BulkDownload] Processing batch of ${batch.length} countries (${i + 1}-${Math.min(i + this.BATCH_SIZE, countries.length)}/${countries.length})`);
 
-        try {
-          // Download and enhance advisory for this country
-          await this.downloadCountryAdvisory(country);
-          
-          // Use transactional update for atomicity
-          await storage.updateJobWithTransaction(jobId, country, 'completed');
-          
-          // Update in-memory progress for UI/API
-          progress.processedCountries++;
-        } catch (error) {
-          console.error(`[BulkDownload] Failed to process ${country}:`, error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          
-          // Use transactional update for atomicity
-          try {
-            await storage.updateJobWithTransaction(jobId, country, 'failed', errorMessage);
-          } catch (txError) {
-            console.error('[BulkDownload] Failed to update job transaction:', txError);
-          }
-          
-          // Update in-memory progress for UI/API
-          progress.failedCountries++;
-          progress.errors.push({
-            country,
-            error: errorMessage
-          });
-        }
+        // Process all countries in the batch concurrently
+        await Promise.all(
+          batch.map(country => this.processCountryWithRetry(jobId, country, progress))
+        );
 
-        // Delay before next country to avoid rate limiting
-        if (progress.processedCountries < countries.length) {
-          await this.delay(this.DELAY_BETWEEN_COUNTRIES);
+        // Delay between batches to avoid rate limiting
+        if (i + this.BATCH_SIZE < countries.length) {
+          await this.delay(this.DELAY_BETWEEN_BATCHES);
         }
       }
 
@@ -347,7 +326,64 @@ class BulkDownloadService {
   }
 
   /**
-   * Download advisory for a single country
+   * Process a single country with retry logic
+   */
+  private async processCountryWithRetry(
+    jobId: string, 
+    country: string, 
+    progress: BulkDownloadProgress
+  ): Promise<void> {
+    progress.currentCountry = country;
+    const currentIndex = progress.processedCountries + progress.failedCountries + 1;
+    console.log(`[BulkDownload] Processing ${country} (${currentIndex}/${progress.totalCountries})`);
+
+    let lastError: Error | null = null;
+
+    // Retry loop
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        // Download and enhance advisory for this country
+        await this.downloadCountryAdvisory(country);
+        
+        // Use transactional update for atomicity
+        await storage.updateJobWithTransaction(jobId, country, 'completed');
+        
+        // Update in-memory progress for UI/API
+        progress.processedCountries++;
+        return; // Success - exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        if (attempt < this.MAX_RETRIES) {
+          // Exponential backoff: 2s, 4s, 8s
+          const delayMs = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+          console.warn(`[BulkDownload] Retry ${attempt}/${this.MAX_RETRIES} for ${country} after ${delayMs}ms delay`);
+          await this.delay(delayMs);
+        }
+      }
+    }
+
+    // All retries failed
+    console.error(`[BulkDownload] Failed to process ${country} after ${this.MAX_RETRIES} attempts:`, lastError);
+    const errorMessage = lastError?.message || 'Unknown error';
+    
+    // Use transactional update for atomicity
+    try {
+      await storage.updateJobWithTransaction(jobId, country, 'failed', errorMessage);
+    } catch (txError) {
+      console.error('[BulkDownload] Failed to update job transaction:', txError);
+    }
+    
+    // Update in-memory progress for UI/API
+    progress.failedCountries++;
+    progress.errors.push({
+      country,
+      error: errorMessage
+    });
+  }
+
+  /**
+   * Download advisory for a single country with timeout
    */
   private async downloadCountryAdvisory(countryName: string): Promise<void> {
     // Use dataFetcher to get US State Department advisory with AI enhancement

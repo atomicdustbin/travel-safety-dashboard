@@ -5,6 +5,9 @@ import { JSDOM } from "jsdom";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Timeout for API calls (30 seconds)
+const API_TIMEOUT_MS = 30000;
+
 interface EnhancedSummary {
   summary: string;
   keyRisks: string[];
@@ -12,6 +15,18 @@ interface EnhancedSummary {
   specificAreas: string[];
   lastUpdated: string;
   aiApplied: boolean; // Flag to indicate if AI analysis actually occurred
+}
+
+/**
+ * Utility function to add timeout to promises
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
 }
 
 export async function enhanceStateDeptSummary(
@@ -94,21 +109,25 @@ Focus on providing practical, actionable guidance even with limited information.
 `;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a travel safety expert. Provide practical travel guidance based on government travel advisories. Respond with valid JSON."
-        },
-        {
-          role: "user", 
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 800
-    });
+    const response = await withTimeout(
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a travel safety expert. Provide practical travel guidance based on government travel advisories. Respond with valid JSON."
+          },
+          {
+            role: "user", 
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 800
+      }),
+      API_TIMEOUT_MS,
+      `OpenAI API call for ${countryName} base summary`
+    );
 
     const rawContent = response.choices[0].message.content || '{}';
     const result = JSON.parse(rawContent);
@@ -313,16 +332,17 @@ Focus on extracting concrete, actionable information that would help travelers m
 
   try{
     // Use a working model with structured outputs for reliable results
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Use gpt-4o-mini which is known to work reliably with structured outputs
-      messages: [
-        {
-          role: "system",
-          content: "You are a travel safety expert who analyzes government travel advisories. Respond with valid JSON that provides detailed, practical guidance for travelers."
-        },
-        {
-          role: "user", 
-          content: `Analyze this US State Department travel advisory for ${countryName} and provide detailed, actionable information.
+    const response = await withTimeout(
+      openai.chat.completions.create({
+        model: "gpt-4o-mini", // Use gpt-4o-mini which is known to work reliably with structured outputs
+        messages: [
+          {
+            role: "system",
+            content: "You are a travel safety expert who analyzes government travel advisories. Respond with valid JSON that provides detailed, practical guidance for travelers."
+          },
+          {
+            role: "user", 
+            content: `Analyze this US State Department travel advisory for ${countryName} and provide detailed, actionable information.
 
 Original summary: "${originalSummary}"
 
@@ -334,11 +354,14 @@ Provide a comprehensive analysis in JSON format with:
 - keyRisks: Array of 3-6 specific risks or threats mentioned  
 - safetyRecommendations: Array of 3-6 specific safety recommendations
 - specificAreas: Array of specific cities, regions, or areas mentioned`
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000
-    });
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000
+      }),
+      API_TIMEOUT_MS,
+      `OpenAI API call for ${countryName} full advisory`
+    );
 
     // Extract JSON content from chat completions response
     const rawContent = response.choices[0].message.content || '{}';
