@@ -20,6 +20,7 @@ export interface IStorage {
   // Combined operations
   getCountryData(countryName: string): Promise<CountryData | undefined>;
   searchCountries(countryNames: string[]): Promise<CountryData[]>;
+  getAllCountriesWithData(): Promise<CountryData[]>;
 
   // Bulk Jobs
   getBulkJob(id: string): Promise<BulkJob | undefined>;
@@ -170,6 +171,26 @@ export class MemStorage implements IStorage {
       const countryData = await this.getCountryData(name.trim());
       if (countryData) {
         results.push(countryData);
+      }
+    }
+    
+    return results;
+  }
+
+  async getAllCountriesWithData(): Promise<CountryData[]> {
+    const results: CountryData[] = [];
+    
+    for (const country of this.countries.values()) {
+      const alerts = await this.getAlertsByCountryId(country.id);
+      const background = await this.getBackgroundInfoByCountryId(country.id);
+      
+      // Only include countries that have alerts (meaning they have cached data)
+      if (alerts.length > 0) {
+        results.push({
+          country,
+          alerts,
+          background: background || null,
+        });
       }
     }
     

@@ -99,6 +99,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all countries with cached data
+  app.get("/api/countries", async (req, res) => {
+    try {
+      const countries = await storage.getAllCountriesWithData();
+      
+      // Calculate highest threat level for each country
+      const countriesWithThreat = countries.map(countryData => {
+        const threatLevels = countryData.alerts.map(alert => alert.severity);
+        const highestThreat = 
+          threatLevels.includes('high') ? 'high' :
+          threatLevels.includes('medium') ? 'medium' :
+          threatLevels.includes('low') ? 'low' : 'info';
+        
+        return {
+          country: countryData.country,
+          highestThreat,
+          lastUpdated: countryData.country.lastUpdated,
+          alertCount: countryData.alerts.length
+        };
+      });
+      
+      res.json({ countries: countriesWithThreat });
+    } catch (error) {
+      console.error("Failed to fetch countries:", error);
+      res.status(500).json({ error: "Failed to fetch countries" });
+    }
+  });
+
   // PDF Export endpoint
   app.post("/api/export/pdf", async (req, res) => {
     try {
