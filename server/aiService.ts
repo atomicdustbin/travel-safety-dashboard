@@ -22,11 +22,8 @@ export async function enhanceStateDeptSummary(
   try {
     // Fetch the full advisory page content
     const pageContent = await fetchAdvisoryPageContent(advisoryLink);
-    console.log(`[DEBUG] Page content length for ${countryName}:`, pageContent?.length || 0);
-    console.log(`[DEBUG] Page content preview for ${countryName}:`, pageContent?.substring(0, 200) || 'NO CONTENT');
     
     if (!pageContent) {
-      console.log(`[DEBUG] No page content fetched for ${countryName}, trying AI analysis of base summary`);
       // Fallback: Try AI analysis of the base summary when full page isn't available
       try {
         if (originalSummary && originalSummary.length > 20) {
@@ -38,7 +35,7 @@ export async function enhanceStateDeptSummary(
           };
         }
       } catch (error) {
-        console.warn(`[DEBUG] Fallback AI analysis failed for ${countryName}:`, error);
+        // Fallback AI analysis failed, will return original
       }
       
       // If fallback AI also fails, return original - NO AI applied
@@ -80,8 +77,6 @@ async function analyzeBaseSummary(
   baseSummary: string, 
   countryName: string
 ): Promise<Omit<EnhancedSummary, 'lastUpdated'>> {
-  console.log(`[DEBUG] Analyzing base summary for ${countryName}: ${baseSummary.substring(0, 100)}...`);
-
   const prompt = `
 Analyze this US State Department travel advisory summary for ${countryName} and extract key information for travelers.
 
@@ -116,21 +111,16 @@ Focus on providing practical, actionable guidance even with limited information.
     });
 
     const rawContent = response.choices[0].message.content || '{}';
-    console.log(`[DEBUG] Base summary AI response for ${countryName}:`, rawContent);
-    
     const result = JSON.parse(rawContent);
     
     // Validate and structure the response
-    const processedResult = {
+    return {
       summary: result.summary || baseSummary,
       keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
       safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
       specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : [],
       aiApplied: true
     };
-    
-    console.log(`[DEBUG] Base summary processed result for ${countryName}:`, JSON.stringify(processedResult, null, 2));
-    return processedResult;
 
   } catch (error) {
     console.error('Error analyzing base summary with OpenAI:', error);
@@ -148,45 +138,32 @@ Focus on providing practical, actionable guidance even with limited information.
 
 async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
   try {
-    console.log(`[DEBUG] Fetching URL: ${url}`);
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Global Advisor Bot/1.0)'
       }
     });
 
-    console.log(`[DEBUG] Response status: ${response.status}`);
-    console.log(`[DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
-      console.warn(`Failed to fetch advisory page: ${response.status}`);
       return null;
     }
 
     const html = await response.text();
-    console.log(`[DEBUG] Raw HTML length: ${html.length}`);
-    console.log(`[DEBUG] Raw HTML preview: ${html.substring(0, 500)}`);
     
     // Check for CAPTCHA protection
     const captchaIndicators = /recaptcha|grecaptcha|START CAPTCHA|captcha/i;
     if (captchaIndicators.test(html)) {
-      console.warn(`[DEBUG] CAPTCHA detected in page - skipping content extraction`);
       return null;
     }
     
     // Check if page appears to be JavaScript-dependent or too short
     if (html.includes('window.location') || html.includes('document.createElement') || html.length < 1000) {
-      console.warn(`[DEBUG] Page may be JavaScript-dependent or redirecting`);
+      return null;
     }
     
     // Parse HTML and extract main content
     const dom = new JSDOM(html);
     const document = dom.window.document;
-    
-    // Save HTML for debugging if needed
-    if (html.length > 100000) {
-      console.log(`[DEBUG] Large HTML detected (${html.length} chars) - analyzing structure`);
-    }
     
     // Remove scripts, styles, navigation, and other non-content elements first
     const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, .navigation, .sidebar, .ads, .breadcrumb, .site-header, .site-footer, .skip-link, .menu, .navbar, #header, #footer, #navigation');
@@ -213,14 +190,12 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
       mainContent = document.querySelector(selector);
       if (mainContent && mainContent.textContent && mainContent.textContent.length > 500) {
         extractionMethod = `selector: ${selector}`;
-        console.log(`[DEBUG] Found content using ${extractionMethod}`);
         break;
       }
     }
     
     // Strategy 2: Look for elements with travel advisory keywords and substantial content
     if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 500)) {
-      console.log(`[DEBUG] Trying keyword-based content detection`);
       const allElements = Array.from(document.querySelectorAll('div, section, article, main, [role="main"]'));
       
       for (const element of allElements) {
@@ -243,7 +218,6 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
           if (keywordMatches >= 3) { // Must match multiple keywords
             mainContent = element;
             extractionMethod = `keywords: ${keywordMatches} matches`;
-            console.log(`[DEBUG] Found content using ${extractionMethod}, length: ${text.length}`);
             break;
           }
         }
@@ -252,7 +226,6 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
     
     // Strategy 3: Look for the largest content block that seems meaningful
     if (!mainContent || (mainContent.textContent && mainContent.textContent.length < 500)) {
-      console.log(`[DEBUG] Trying largest content block strategy`);
       const contentElements = Array.from(document.querySelectorAll('div, section, article'));
       let largestElement: Element | null = null;
       let largestSize = 0;
@@ -273,13 +246,11 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
       if (largestElement) {
         mainContent = largestElement;
         extractionMethod = `largest block: ${largestSize} chars`;
-        console.log(`[DEBUG] Found content using ${extractionMethod}`);
       }
     }
     
     // Fallback: use body but clean heavily
     if (!mainContent) {
-      console.log(`[DEBUG] Using fallback body extraction`);
       mainContent = document.body;
       extractionMethod = 'body fallback';
       
@@ -290,7 +261,6 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
     
     // Extract and clean text content
     let textContent = mainContent?.textContent || '';
-    console.log(`[DEBUG] Raw extracted content length: ${textContent.length} using ${extractionMethod}`);
     
     textContent = textContent
       .replace(/\s+/g, ' ')  // Replace multiple whitespace with single space
@@ -301,8 +271,6 @@ async function fetchAdvisoryPageContent(url: string): Promise<string | null> {
       .replace(/Congressional Liaison.*?Contact Us/gi, '')  // Remove header navigation
       .replace(/Travel Advisories\s*\|\s*Newsroom/gi, '')  // Remove nav links
       .trim();
-    
-    console.log(`[DEBUG] Cleaned content length: ${textContent.length}`);
     
     return textContent;
 
@@ -343,10 +311,7 @@ Please provide a comprehensive analysis in JSON format with these fields:
 Focus on extracting concrete, actionable information that would help travelers make informed decisions. Include specific details about crime patterns, safe areas, transportation safety, health precautions, and any special circumstances.
 `;
 
-  console.log(`[DEBUG] Sending prompt to ChatGPT for ${countryName}:`, prompt.substring(0, 500) + '...');
-  console.log(`[DEBUG] Truncated content length for ${countryName}:`, truncatedContent.length);
-
-  try {
+  try{
     // Use a working model with structured outputs for reliable results
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini", // Use gpt-4o-mini which is known to work reliably with structured outputs
@@ -377,39 +342,21 @@ Provide a comprehensive analysis in JSON format with:
 
     // Extract JSON content from chat completions response
     const rawContent = response.choices[0].message.content || '{}';
-    console.log(`[DEBUG] ChatGPT response for ${countryName}:`, rawContent);
-    
     const result = JSON.parse(rawContent);
-    console.log(`[DEBUG] Parsed ChatGPT result for ${countryName}:`, JSON.stringify(result, null, 2));
     
     // Validate that essential fields are present - be flexible with arrays
     if (!result.summary || result.summary.length < 20) {
-      console.warn(`[DEBUG] Invalid summary for ${countryName}: too short or missing`);
       result.summary = originalSummary; // Fallback to original
     }
     
-    // Log validation warnings but don't throw errors for missing array data
-    if (!Array.isArray(result.keyRisks) || result.keyRisks.length < 1) {
-      console.warn(`[DEBUG] Limited keyRisks for ${countryName}: ${result.keyRisks?.length || 0} items`);
-    }
-    if (!Array.isArray(result.safetyRecommendations) || result.safetyRecommendations.length < 1) {
-      console.warn(`[DEBUG] Limited safetyRecommendations for ${countryName}: ${result.safetyRecommendations?.length || 0} items`);
-    }
-    if (!Array.isArray(result.specificAreas) || result.specificAreas.length < 1) {
-      console.warn(`[DEBUG] Limited specificAreas for ${countryName}: ${result.specificAreas?.length || 0} items`);
-    }
-    
-    // Validate the response structure
-    const processedResult = {
+    // Return structured result
+    return {
       summary: result.summary || originalSummary,
       keyRisks: Array.isArray(result.keyRisks) ? result.keyRisks : [],
       safetyRecommendations: Array.isArray(result.safetyRecommendations) ? result.safetyRecommendations : [],
       specificAreas: Array.isArray(result.specificAreas) ? result.specificAreas : [],
       aiApplied: true // AI analysis was successfully applied
     };
-    
-    console.log(`[DEBUG] Processed result for ${countryName}:`, JSON.stringify(processedResult, null, 2));
-    return processedResult;
 
   } catch (error) {
     console.error('Error analyzing advisory content with OpenAI:', error);
