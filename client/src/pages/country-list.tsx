@@ -21,7 +21,7 @@ interface CountryListItem {
     flagUrl: string | null;
     lastUpdated: Date | null;
   };
-  highestThreat: "high" | "medium" | "low" | "info";
+  threatLevel: number | null; // 1-4 or null
   lastUpdated: Date | null;
   alertCount: number;
 }
@@ -57,16 +57,6 @@ export default function CountryList() {
     );
   };
 
-  const getThreatLevel = (threat: string): number => {
-    const levels: Record<string, number> = {
-      high: 4,
-      medium: 3,
-      low: 2,
-      info: 1,
-    };
-    return levels[threat] || 0;
-  };
-
   const sortedCountries = [...countries].sort((a, b) => {
     let comparison = 0;
 
@@ -75,7 +65,9 @@ export default function CountryList() {
         comparison = a.country.name.localeCompare(b.country.name);
         break;
       case "threat":
-        comparison = getThreatLevel(a.highestThreat) - getThreatLevel(b.highestThreat);
+        const levelA = a.threatLevel || 0;
+        const levelB = b.threatLevel || 0;
+        comparison = levelA - levelB;
         break;
       case "lastUpdated":
         const dateA = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
@@ -87,20 +79,34 @@ export default function CountryList() {
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  const getThreatBadge = (threat: string) => {
-    const variants: Record<string, { variant: any; label: string }> = {
-      high: { variant: "destructive", label: "High Risk" },
-      medium: { variant: "default", label: "Medium Risk" },
-      low: { variant: "secondary", label: "Low Risk" },
-      info: { variant: "outline", label: "Info Only" },
-    };
+  const getThreatLevelColor = (level: number | null) => {
+    switch (level) {
+      case 1:
+        return "bg-green-600 text-white";
+      case 2:
+        return "bg-yellow-500 text-white";
+      case 3:
+        return "bg-orange-500 text-white";
+      case 4:
+        return "bg-red-600 text-white";
+      default:
+        return "bg-gray-500 text-white";
+    }
+  };
 
-    const config = variants[threat] || variants.info;
-    return (
-      <Badge variant={config.variant} data-testid={`badge-threat-${threat}`}>
-        {config.label}
-      </Badge>
-    );
+  const getThreatLevelText = (level: number | null) => {
+    switch (level) {
+      case 1:
+        return "Level 1: Exercise Normal Precautions";
+      case 2:
+        return "Level 2: Exercise Increased Caution";
+      case 3:
+        return "Level 3: Reconsider Travel";
+      case 4:
+        return "Level 4: Do Not Travel";
+      default:
+        return "No Advisory";
+    }
   };
 
   const formatDate = (date: Date | null) => {
@@ -239,7 +245,9 @@ export default function CountryList() {
                       {item.country.name}
                     </TableCell>
                     <TableCell data-testid={`text-threat-${item.country.id}`}>
-                      {getThreatBadge(item.highestThreat)}
+                      <div className={`px-3 py-1.5 rounded text-sm font-semibold inline-block ${getThreatLevelColor(item.threatLevel)}`}>
+                        {item.threatLevel ? `Level ${item.threatLevel}` : "N/A"}
+                      </div>
                     </TableCell>
                     <TableCell
                       className="text-muted-foreground"

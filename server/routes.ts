@@ -104,17 +104,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const countries = await storage.getAllCountriesWithData();
       
-      // Calculate highest threat level for each country
+      // Extract US State Dept threat level (1-4) for each country
       const countriesWithThreat = countries.map(countryData => {
-        const threatLevels = countryData.alerts.map(alert => alert.severity);
-        const highestThreat = 
-          threatLevels.includes('high') ? 'high' :
-          threatLevels.includes('medium') ? 'medium' :
-          threatLevels.includes('low') ? 'low' : 'info';
+        const stateDeptAlert = countryData.alerts.find(alert => alert.source === "US State Dept");
+        let threatLevel: number | null = null;
+        
+        if (stateDeptAlert?.level) {
+          const levelMatch = stateDeptAlert.level.match(/Level (\d)/);
+          threatLevel = levelMatch ? parseInt(levelMatch[1]) : null;
+        }
         
         return {
           country: countryData.country,
-          highestThreat,
+          threatLevel, // null or 1-4
           lastUpdated: countryData.country.lastUpdated,
           alertCount: countryData.alerts.length
         };
