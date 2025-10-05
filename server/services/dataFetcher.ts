@@ -2,11 +2,20 @@ import { storage } from "../storage";
 import { type InsertAlert, type InsertBackgroundInfo } from "@shared/schema";
 import { enhanceStateDeptSummary, isAIEnhancementAvailable } from "../aiService";
 
+interface ThreatLevelCache {
+  levels: Map<string, number>;
+  lastUpdated: Date;
+}
+
 export class DataFetcher {
   private apiKeys = {
     worldBank: process.env.WORLD_BANK_API_KEY || "",
     restCountries: process.env.REST_COUNTRIES_API_KEY || "",
   };
+
+  // Cache for State Department threat levels (refreshed every 24 hours)
+  private threatLevelCache: ThreatLevelCache | null = null;
+  private readonly THREAT_LEVEL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   // Comprehensive list of valid countries and territories
   private validCountries = new Set([
@@ -151,13 +160,13 @@ export class DataFetcher {
       const country = await storage.getCountryByName(countryName);
       if (!country) return alerts;
 
-      // Create the basic advisory structure with default level
-      const defaultLevel = this.getDefaultAdvisoryLevel(countryName);
+      // Fetch real threat level from State Dept API (with fallback to defaults)
+      const apiLevel = await this.getAdvisoryLevel(countryName);
       const advisoryLink = `https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories/${this.formatStateDeptUrlSlug(countryName)}-travel-advisory.html`;
 
-      // Start with default level, will be updated by AI if available
-      let finalAdvisoryLevel = defaultLevel;
-      const baseSummary = `Exercise ${defaultLevel === 4 ? 'extreme' : defaultLevel === 3 ? 'increased' : defaultLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`;
+      // Start with API level, may be enhanced by AI with additional details
+      let finalAdvisoryLevel = apiLevel;
+      const baseSummary = `Exercise ${apiLevel === 4 ? 'extreme' : apiLevel === 3 ? 'increased' : apiLevel === 2 ? 'enhanced' : 'normal'} caution when traveling to ${countryName}. Check current conditions and security alerts.`;
       
       // Enhanced summary using AI if available
       let finalSummary = baseSummary;
@@ -171,11 +180,9 @@ export class DataFetcher {
           // Always store enhanced data if AI call was successful
           enhancedData = enhanced;
           
-          // Use AI-extracted threat level if available, otherwise keep default
-          if (enhanced.threatLevel && enhanced.threatLevel >= 1 && enhanced.threatLevel <= 4) {
-            finalAdvisoryLevel = enhanced.threatLevel;
-            finalTitle = `Travel Advisory - Level ${finalAdvisoryLevel}`;
-          }
+          // Note: We use the API-provided threat level, not AI interpretation
+          // The official State Dept API is the authoritative source for threat levels
+          finalTitle = `Travel Advisory - Level ${finalAdvisoryLevel}`;
           
           // Use enhanced summary if available and different
           if (enhanced.summary && enhanced.summary !== baseSummary) {
@@ -188,7 +195,7 @@ export class DataFetcher {
           }
         } catch (error) {
           console.error(`[ERROR] AI enhancement failed for ${countryName}:`, error);
-          // Continue with default level and basic summary
+          // Continue with API level and basic summary
         }
       }
 
@@ -699,20 +706,82 @@ export class DataFetcher {
     return specialCases[lowerName] || lowerName.replace(/\s+/g, '-');
   }
 
-  private getDefaultAdvisoryLevel(countryName: string): number {
-    const countryRiskLevels: { [key: string]: number } = {
-      "afghanistan": 4, "iraq": 4, "syria": 4, "yemen": 4, "libya": 4, "somalia": 4,
-      "iran": 4, "north korea": 4, "venezuela": 4, "myanmar": 4,
-      "ukraine": 3, "lebanon": 3, "pakistan": 3, "colombia": 3, "mexico": 3,
-      "egypt": 3, "turkey": 3, "haiti": 3, "mali": 3, "nigeria": 3,
-      "india": 2, "philippines": 2, "kenya": 2, "indonesia": 2, "brazil": 2,
-      "south africa": 2, "russia": 2, "china": 2, "belarus": 2, "ethiopia": 2,
-      "japan": 1, "south korea": 1, "singapore": 1, "australia": 1, "new zealand": 1,
-      "canada": 1, "united kingdom": 1, "germany": 1, "france": 1, "italy": 1,
-      "spain": 1, "netherlands": 1, "sweden": 1, "norway": 1, "denmark": 1,
-      "thailand": 2, "vietnam": 2, "cambodia": 2, "laos": 2,
-    };
-    return countryRiskLevels[countryName.toLowerCase()] || 2;
+  /**
+   * Fetches current threat levels from official State Department API
+   * Returns a map of country names (lowercase) to threat levels (1-4)
+   * Data is cached for 24 hours to minimize API calls
+   */
+  private async fetchStateDeptThreatLevels(): Promise<Map<string, number>> {
+    if (this.threatLevelCache && 
+        (Date.now() - this.threatLevelCache.lastUpdated.getTime()) < this.THREAT_LEVEL_CACHE_TTL) {
+      return this.threatLevelCache.levels;
+    }
+
+    try {
+      const response = await fetch('https://cadataapi.state.gov/api/TravelAdvisories');
+      
+      if (!response.ok) {
+        console.error(`State Dept API returned status ${response.status}`);
+        return this.getFallbackThreatLevels();
+      }
+
+      const data = await response.json();
+      const levels = new Map<string, number>();
+
+      for (const advisory of data) {
+        if (advisory.Title) {
+          const levelMatch = advisory.Title.match(/^(.+?)\s*-\s*Level\s*(\d)/i);
+          
+          if (levelMatch) {
+            const countryName = levelMatch[1].trim().toLowerCase();
+            const level = parseInt(levelMatch[2]);
+            
+            if (level >= 1 && level <= 4) {
+              levels.set(countryName, level);
+            }
+          }
+        }
+      }
+
+      this.threatLevelCache = {
+        levels,
+        lastUpdated: new Date()
+      };
+
+      console.log(`[State Dept API] Loaded threat levels for ${levels.size} countries`);
+      return levels;
+
+    } catch (error) {
+      console.error('Error fetching State Dept threat levels:', error);
+      return this.getFallbackThreatLevels();
+    }
+  }
+
+  private getFallbackThreatLevels(): Map<string, number> {
+    const fallbackLevels = new Map<string, number>([
+      ["afghanistan", 4], ["iraq", 4], ["syria", 4], ["yemen", 4], ["libya", 4], ["somalia", 4],
+      ["iran", 4], ["north korea", 4], ["venezuela", 4], ["myanmar", 4],
+      ["ukraine", 3], ["lebanon", 3], ["pakistan", 3], ["colombia", 3], ["mexico", 3],
+      ["egypt", 3], ["turkey", 3], ["haiti", 3], ["mali", 3], ["nigeria", 3],
+      ["india", 2], ["philippines", 2], ["kenya", 2], ["indonesia", 2], ["brazil", 2],
+      ["south africa", 2], ["russia", 2], ["china", 2], ["belarus", 2], ["ethiopia", 2],
+      ["japan", 1], ["south korea", 1], ["singapore", 1], ["australia", 1], ["new zealand", 1],
+      ["canada", 1], ["united kingdom", 1], ["germany", 1], ["france", 1], ["italy", 1],
+      ["spain", 1], ["netherlands", 1], ["sweden", 1], ["norway", 1], ["denmark", 1],
+      ["thailand", 2], ["vietnam", 2], ["cambodia", 2], ["laos", 2],
+    ]);
+    return fallbackLevels;
+  }
+
+  private async getAdvisoryLevel(countryName: string): Promise<number> {
+    const levels = await this.fetchStateDeptThreatLevels();
+    const normalizedName = countryName.toLowerCase();
+    
+    if (levels.has(normalizedName)) {
+      return levels.get(normalizedName)!;
+    }
+    
+    return 2;
   }
 
   private getHealthConcerns(countryName: string): { level: string; severity: string; summary: string } {
