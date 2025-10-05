@@ -22,40 +22,10 @@ class BulkDownloadService {
 
   /**
    * Get all valid countries that can be processed
+   * Uses dataFetcher's country validation to ensure consistency
    */
   private getValidCountries(): string[] {
-    // Get the full list from dataFetcher
-    const validCountries = [
-      // Major countries
-      "afghanistan", "albania", "algeria", "andorra", "angola", "antigua and barbuda", "argentina", 
-      "armenia", "australia", "austria", "azerbaijan", "bahamas", "bahrain", "bangladesh", "barbados", 
-      "belarus", "belgium", "belize", "benin", "bhutan", "bolivia", "bosnia and herzegovina", "botswana", 
-      "brazil", "brunei", "bulgaria", "burkina faso", "burundi", "cambodia", "cameroon", "canada", 
-      "cape verde", "central african republic", "chad", "chile", "china", "colombia", "comoros", 
-      "congo", "costa rica", "croatia", "cuba", "cyprus", "czech republic", "denmark", "djibouti", 
-      "dominica", "dominican republic", "ecuador", "egypt", "el salvador", "equatorial guinea", "eritrea", 
-      "estonia", "eswatini", "ethiopia", "fiji", "finland", "france", "gabon", "gambia", "georgia", 
-      "germany", "ghana", "greece", "grenada", "guatemala", "guinea", "guinea-bissau", "guyana", "haiti", 
-      "honduras", "hungary", "iceland", "india", "indonesia", "iran", "iraq", "ireland", "israel", 
-      "italy", "ivory coast", "jamaica", "japan", "jordan", "kazakhstan", "kenya", "kiribati", "kosovo", 
-      "kuwait", "kyrgyzstan", "laos", "latvia", "lebanon", "lesotho", "liberia", "libya", "liechtenstein", 
-      "lithuania", "luxembourg", "madagascar", "malawi", "malaysia", "maldives", "mali", "malta", 
-      "marshall islands", "mauritania", "mauritius", "mexico", "micronesia", "moldova", "monaco", 
-      "mongolia", "montenegro", "morocco", "mozambique", "myanmar", "namibia", "nauru", "nepal", 
-      "netherlands", "new zealand", "nicaragua", "niger", "nigeria", "north korea", "north macedonia", 
-      "norway", "oman", "pakistan", "palau", "palestine", "panama", "papua new guinea", "paraguay", 
-      "peru", "philippines", "poland", "portugal", "qatar", "romania", "russia", "rwanda", 
-      "saint kitts and nevis", "saint lucia", "saint vincent and the grenadines", "samoa", "san marino", 
-      "sao tome and principe", "saudi arabia", "senegal", "serbia", "seychelles", "sierra leone", 
-      "singapore", "slovakia", "slovenia", "solomon islands", "somalia", "south africa", "south korea", 
-      "south sudan", "spain", "sri lanka", "sudan", "suriname", "sweden", "switzerland", "syria", 
-      "taiwan", "tajikistan", "tanzania", "thailand", "timor-leste", "togo", "tonga", "trinidad and tobago", 
-      "tunisia", "turkey", "turkmenistan", "tuvalu", "uganda", "ukraine", "united arab emirates", 
-      "united kingdom", "united states", "uruguay", "uzbekistan", "vanuatu", "vatican city", "venezuela", 
-      "vietnam", "yemen", "zambia", "zimbabwe"
-    ];
-
-    return validCountries;
+    return dataFetcher.getAllValidCountries();
   }
 
   /**
@@ -76,7 +46,7 @@ class BulkDownloadService {
    * Check if any job is currently running
    */
   private isJobRunning(): boolean {
-    for (const progress of this.activeJobs.values()) {
+    for (const progress of Array.from(this.activeJobs.values())) {
       if (progress.status === 'running') {
         return true;
       }

@@ -1,5 +1,6 @@
 import { dataFetcher } from "./dataFetcher";
 import { bulkDownloadService } from "./bulkDownloadService";
+import { storage } from "../storage";
 
 class DataScheduler {
   private alertRefreshInterval: NodeJS.Timeout | null = null;

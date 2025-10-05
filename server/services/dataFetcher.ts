@@ -81,6 +81,14 @@ export class DataFetcher {
     "drc": "congo"
   };
 
+  /**
+   * Get all valid country names as an array
+   * Used by bulk download service to ensure consistency
+   */
+  getAllValidCountries(): string[] {
+    return Array.from(this.validCountries);
+  }
+
   // Validate if a country name is legitimate
   validateCountryName(countryName: string): { isValid: boolean; normalizedName?: string; suggestion?: string } {
     const normalizedInput = countryName.toLowerCase().trim();
