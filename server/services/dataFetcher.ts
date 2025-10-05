@@ -1,6 +1,8 @@
 import { storage } from "../storage";
 import { type InsertAlert, type InsertBackgroundInfo } from "@shared/schema";
 import { enhanceStateDeptSummary, isAIEnhancementAvailable } from "../aiService";
+import fs from 'fs';
+import path from 'path';
 
 interface ThreatLevelCache {
   levels: Map<string, number>;
@@ -715,9 +717,6 @@ export class DataFetcher {
    */
   private loadCABundle(): void {
     if (this.caBundleLoaded) return;
-    
-    const fs = require('fs');
-    const path = require('path');
     
     try {
       // Try to use combined CA bundle (system + DigiCert certificates) from project directory
