@@ -711,19 +711,46 @@ export class DataFetcher {
   }
 
   /**
-   * Loads system CA bundle once at startup for secure HTTPS requests
+   * Loads CA bundle with DigiCert certificates for secure HTTPS requests to State Dept API
    */
   private loadCABundle(): void {
     if (this.caBundleLoaded) return;
     
+    const fs = require('fs');
+    const path = require('path');
+    
     try {
-      const fs = require('fs');
-      this.caBundle = fs.readFileSync('/etc/ssl/certs/ca-certificates.crt');
-      console.log('[State Dept API] Loaded system CA bundle for secure SSL verification');
+      // Try to use combined CA bundle (system + DigiCert certificates) from project directory
+      const projectPath = path.join(process.cwd(), 'certs', 'ca-bundle.pem');
+      console.log(`[State Dept API] Attempting to load CA bundle from: ${projectPath}`);
+      
+      if (fs.existsSync(projectPath)) {
+        this.caBundle = fs.readFileSync(projectPath);
+        const sizeKB = Math.round(this.caBundle.length / 1024);
+        console.log(`[State Dept API] ✅ Loaded combined CA bundle (${sizeKB}KB with DigiCert certs) for secure SSL verification`);
+        this.caBundleLoaded = true;
+        return;
+      }
+      
+      console.log('[State Dept API] Combined CA bundle not found, trying system bundle');
+      
+      // Fall back to system CA bundle only
+      const systemPath = '/etc/ssl/certs/ca-certificates.crt';
+      if (fs.existsSync(systemPath)) {
+        this.caBundle = fs.readFileSync(systemPath);
+        console.log('[State Dept API] ⚠️  Loaded system CA bundle only (DigiCert certs may be missing)');
+        this.caBundleLoaded = true;
+        return;
+      }
+      
+      // No CA bundle available
+      console.error('[State Dept API] ❌ No CA bundle found at any location');
       this.caBundleLoaded = true;
+      this.caBundle = null;
+      
     } catch (error) {
-      console.error('[State Dept API] CRITICAL: Cannot load system CA bundle - SSL verification will fail');
-      console.error('[State Dept API] Will use fallback threat levels only');
+      console.error('[State Dept API] ❌ CRITICAL: Error loading CA bundle:', error instanceof Error ? error.message : 'unknown error');
+      console.error('[State Dept API] Using fallback threat levels only');
       this.caBundleLoaded = true; // Mark as loaded to prevent retries
       this.caBundle = null;
     }
