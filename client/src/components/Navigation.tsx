@@ -18,7 +18,7 @@ export function Navigation() {
   const [location] = useLocation();
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={true}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -30,7 +30,7 @@ export function Navigation() {
           <span>Menu</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 z-[9999]">
         {pages.map((page) => {
           const Icon = page.icon;
           const isActive = location === page.path;
