@@ -65,15 +65,24 @@ class DataScheduler {
     for (const countryName of Array.from(this.recentCountries)) {
       try {
         // Only refresh background data, not alerts
+        const country = await storage.getCountryByName(countryName);
+        if (!country) {
+          console.warn(`Country ${countryName} not found in storage, skipping background refresh`);
+          continue;
+        }
+
         const ciaData = await dataFetcher.fetchCIAFactbook(countryName);
         const worldBankData = await dataFetcher.fetchWorldBankData(countryName);
         
         if (ciaData) {
-          const backgroundInfo = { ...ciaData };
+          const backgroundInfo = { ...ciaData, countryId: country.id };
           if (worldBankData?.gdpPerCapita) {
             backgroundInfo.gdpPerCapita = worldBankData.gdpPerCapita;
           }
-          // Implementation would update background info here
+          
+          // Persist the background data to storage
+          await storage.createOrUpdateBackgroundInfo(backgroundInfo);
+          console.log(`Successfully refreshed background data for ${countryName}`);
         }
       } catch (error) {
         console.error(`Failed to refresh background data for ${countryName}:`, error);
