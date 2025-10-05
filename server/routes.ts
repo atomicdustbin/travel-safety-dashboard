@@ -266,12 +266,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get system status
   app.get("/api/status", async (req, res) => {
+    const { getDatabaseStatus } = await import("./db");
+    const dbStatus = getDatabaseStatus();
+    
     res.json({
       status: "online",
       lastUpdated: new Date().toISOString(),
       alertRefreshInterval: "6 hours",
       backgroundRefreshInterval: "7 days",
       weeklyBulkDownload: "Sundays at 1 AM",
+      database: {
+        connected: dbStatus.hasConnection,
+        status: dbStatus.status,
+      },
     });
   });
 

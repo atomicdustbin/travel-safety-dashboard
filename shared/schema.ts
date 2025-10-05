@@ -31,7 +31,7 @@ export const alerts = pgTable("alerts", {
 
 export const backgroundInfo = pgTable("background_info", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  countryId: varchar("country_id").notNull(),
+  countryId: varchar("country_id").notNull().unique(),
   languages: json("languages").$type<string[]>(),
   religion: text("religion"),
   gdpPerCapita: integer("gdp_per_capita"),
