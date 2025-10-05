@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Globe, ArrowLeft, ArrowUp, ArrowDown, AlertCircle, X } from "lucide-react";
+import { Globe, ArrowLeft, ArrowUp, ArrowDown, AlertCircle, X, Map } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface CountryListItem {
@@ -192,6 +192,17 @@ export default function CountryList() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/map">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                  data-testid="link-map"
+                >
+                  <Map className="w-4 h-4" />
+                  <span className="hidden sm:inline">Threat Map</span>
+                </Button>
+              </Link>
               <span className="text-sm text-muted-foreground" data-testid="text-country-count">
                 {countries.length} {countries.length === 1 ? "country" : "countries"}
               </span>

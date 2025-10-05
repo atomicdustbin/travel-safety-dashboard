@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import CountryList from "@/pages/country-list";
+import ThreatMap from "@/pages/threat-map";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -12,6 +13,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/countries" component={CountryList} />
+      <Route path="/map" component={ThreatMap} />
       <Route component={NotFound} />
     </Switch>
   );
