@@ -64,13 +64,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Add to scheduler refresh list
         scheduler.addCountryToRefresh(countryName);
         
-        // Check if we have recent data, if not fetch it
-        const existingData = await storage.getCountryData(countryName);
-        if (!existingData) {
+        // Check if we have cached data, if not fetch it
+        let countryData = await storage.getCountryData(countryName);
+        if (!countryData) {
           await dataFetcher.fetchAllCountryData(countryName);
+          countryData = await storage.getCountryData(countryName);
         }
         
-        return storage.getCountryData(countryName);
+        return countryData;
       });
 
       const results = await Promise.all(fetchPromises);
@@ -134,13 +135,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Add to scheduler refresh list
         scheduler.addCountryToRefresh(countryName);
         
-        // Check if we have recent data, if not fetch it
-        const existingData = await storage.getCountryData(countryName);
-        if (!existingData) {
+        // Check if we have cached data, if not fetch it
+        let countryData = await storage.getCountryData(countryName);
+        if (!countryData) {
           await dataFetcher.fetchAllCountryData(countryName);
+          countryData = await storage.getCountryData(countryName);
         }
         
-        return storage.getCountryData(countryName);
+        return countryData;
       });
 
       const results = await Promise.all(fetchPromises);
