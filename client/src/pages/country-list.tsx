@@ -10,7 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Globe, ArrowLeft, ArrowUp, ArrowDown, AlertCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Globe, ArrowLeft, ArrowUp, ArrowDown, AlertCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface CountryListItem {
@@ -26,18 +32,51 @@ interface CountryListItem {
   alertCount: number;
 }
 
+interface Alert {
+  id: string;
+  source: string;
+  title: string;
+  level: string | null;
+  severity: string;
+  summary: string;
+  link: string;
+  date: Date;
+  keyRisks?: string[];
+  safetyRecommendations?: string[];
+  specificAreas?: string[];
+  aiEnhanced?: Date | null;
+}
+
+interface CountryData {
+  country: {
+    id: string;
+    name: string;
+    code: string;
+    flagUrl: string | null;
+  };
+  alerts: Alert[];
+  backgroundInfo: any;
+}
+
 type SortField = "name" | "threat" | "lastUpdated";
 type SortDirection = "asc" | "desc";
 
 export default function CountryList() {
   const [sortField, setSortField] = useState<SortField>("threat");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/countries"],
   });
 
+  const { data: countryDetailData, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ["/api/country", selectedCountry],
+    enabled: !!selectedCountry,
+  });
+
   const countries = ((data as any)?.countries as CountryListItem[]) || [];
+  const countryDetail = countryDetailData as CountryData | undefined;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -116,6 +155,17 @@ export default function CountryList() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleRowClick = (countryName: string) => {
+    setSelectedCountry(countryName);
+  };
+
+  const getAIEnhancedAlert = () => {
+    if (!countryDetail?.alerts) return null;
+    return countryDetail.alerts.find(alert => 
+      alert.aiEnhanced && (alert.keyRisks || alert.safetyRecommendations || alert.specificAreas)
+    );
   };
 
   return (
@@ -229,7 +279,8 @@ export default function CountryList() {
                   <TableRow
                     key={item.country.id}
                     data-testid={`row-country-${item.country.id}`}
-                    className="hover:bg-accent/50 transition-colors"
+                    onClick={() => handleRowClick(item.country.name)}
+                    className="hover:bg-accent/50 transition-colors cursor-pointer"
                   >
                     <TableCell>
                       {item.country.flagUrl && (
@@ -262,6 +313,125 @@ export default function CountryList() {
           </div>
         )}
       </main>
+
+      {/* AI Summary Dialog */}
+      <Dialog open={!!selectedCountry} onOpenChange={(open) => !open && setSelectedCountry(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="dialog-ai-summary">
+          <DialogHeader>
+            <DialogTitle className="text-2xl capitalize flex items-center gap-3">
+              {selectedCountry && countryDetail?.country.flagUrl && (
+                <img
+                  src={countryDetail.country.flagUrl}
+                  alt={`${selectedCountry} flag`}
+                  className="w-10 h-7 object-cover rounded"
+                />
+              )}
+              {selectedCountry}
+            </DialogTitle>
+          </DialogHeader>
+
+          {isLoadingDetail && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground">Loading AI-enhanced summary...</p>
+            </div>
+          )}
+
+          {!isLoadingDetail && countryDetail && (() => {
+            const aiAlert = getAIEnhancedAlert();
+            
+            if (!aiAlert) {
+              return (
+                <div className="py-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    No AI-enhanced summary available for this country.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6" data-testid="ai-summary-content">
+                {/* Key Risks */}
+                {aiAlert.keyRisks && aiAlert.keyRisks.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-foreground flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-orange-500" />
+                      Key Risks
+                    </h3>
+                    <ul className="space-y-2">
+                      {aiAlert.keyRisks.map((risk, index) => (
+                        <li
+                          key={index}
+                          className="flex items-start gap-2 text-foreground"
+                          data-testid={`key-risk-${index}`}
+                        >
+                          <span className="text-orange-500 mt-1">•</span>
+                          <span>{risk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Safety Recommendations */}
+                {aiAlert.safetyRecommendations && aiAlert.safetyRecommendations.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-foreground flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-blue-500" />
+                      Safety Recommendations
+                    </h3>
+                    <ul className="space-y-2">
+                      {aiAlert.safetyRecommendations.map((rec, index) => (
+                        <li
+                          key={index}
+                          className="flex items-start gap-2 text-foreground"
+                          data-testid={`safety-rec-${index}`}
+                        >
+                          <span className="text-blue-500 mt-1">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Specific Areas */}
+                {aiAlert.specificAreas && aiAlert.specificAreas.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-foreground flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-purple-500" />
+                      Specific Areas of Concern
+                    </h3>
+                    <ul className="space-y-2">
+                      {aiAlert.specificAreas.map((area, index) => (
+                        <li
+                          key={index}
+                          className="flex items-start gap-2 text-foreground"
+                          data-testid={`specific-area-${index}`}
+                        >
+                          <span className="text-purple-500 mt-1">•</span>
+                          <span>{area}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* AI Enhancement Date */}
+                {aiAlert.aiEnhanced && (
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-sm text-muted-foreground">
+                      AI-enhanced on {formatDate(aiAlert.aiEnhanced)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
