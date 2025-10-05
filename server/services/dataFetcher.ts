@@ -555,27 +555,6 @@ export class DataFetcher {
     }
   }
 
-  private getCountryCode(countryName: string): string {
-    const codes: { [key: string]: string } = {
-      "afghanistan": "AF", "albania": "AL", "algeria": "DZ", "argentina": "AR", "australia": "AU",
-      "austria": "AT", "bangladesh": "BD", "belarus": "BY", "belgium": "BE", "bolivia": "BO",
-      "brazil": "BR", "burkina faso": "BF", "cambodia": "KH", "canada": "CA", "chad": "TD",
-      "chile": "CL", "china": "CN", "colombia": "CO", "costa rica": "CR", "cuba": "CU",
-      "denmark": "DK", "ecuador": "EC", "egypt": "EG", "ethiopia": "ET", "fiji": "FJ",
-      "finland": "FI", "france": "FR", "germany": "DE", "ghana": "GH", "greece": "GR",
-      "haiti": "HT", "india": "IN", "indonesia": "ID", "iran": "IR", "iraq": "IQ",
-      "ireland": "IE", "israel": "IL", "italy": "IT", "jamaica": "JM", "japan": "JP",
-      "jordan": "JO", "kenya": "KE", "laos": "LA", "lebanon": "LB", "libya": "LY",
-      "mali": "ML", "mexico": "MX", "myanmar": "MM", "nepal": "NP", "netherlands": "NL",
-      "new zealand": "NZ", "niger": "NE", "nigeria": "NG", "north korea": "KP", "norway": "NO",
-      "pakistan": "PK", "panama": "PA", "papua new guinea": "PG", "peru": "PE", "philippines": "PH", "poland": "PL",
-      "portugal": "PT", "russia": "RU", "singapore": "SG", "somalia": "SO", "south africa": "ZA",
-      "south korea": "KR", "spain": "ES", "sweden": "SE", "syria": "SY", "thailand": "TH",
-      "turkey": "TR", "ukraine": "UA", "united kingdom": "GB", "united states": "US", "venezuela": "VE",
-      "vietnam": "VN", "yemen": "YE", "zimbabwe": "ZW"
-    };
-    return codes[countryName.toLowerCase()] || "XX";
-  }
 
   private getCountryCode3Letter(countryName: string): string {
     const codes: { [key: string]: string } = {
