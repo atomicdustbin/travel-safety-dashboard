@@ -53,7 +53,11 @@ Preferred communication style: Simple, everyday language.
   - Background metadata: Every 7 days
   - **Complete US State Dept database**: Weekly (Sundays at 1 AM) with AI enhancement for all 200+ countries
 - **AI Enhancement**: ChatGPT integration analyzes full advisory pages to extract key risks, safety recommendations, and specific areas of concern
-- **Caching Strategy**: In-memory storage for development, PostgreSQL for production with query optimization
+- **Persistent Caching Strategy**:
+  - All downloaded data stored in PostgreSQL cloud database for persistence
+  - Search queries check cached data first, only fetch online if no cache exists
+  - Automatic storage selection: PostgreSQL when DATABASE_URL exists, in-memory for local dev
+  - Cache-first approach ensures fast response times and reduced API calls
 - **Data Validation**: Zod schemas for runtime type checking and validation
 - **Progress Tracking**: Real-time progress monitoring for bulk downloads with error recovery and job persistence
 
