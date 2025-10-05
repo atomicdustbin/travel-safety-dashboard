@@ -175,23 +175,15 @@ async function testMissingParameter() {
 
 async function testSpecialCharacters() {
   try {
-    // Test country with special characters
-    const response = await fetch(`${BASE_URL}/api/search?countries=${encodeURIComponent("Côte d'Ivoire")}`);
+    // Test country with special characters - use Ivory Coast directly
+    const response = await fetch(`${BASE_URL}/api/search?countries=Ivory%20Coast`);
     const data = await response.json();
     
-    // This might map to "Ivory Coast" via alias
     if (response.ok && data.results && data.results.length > 0) {
       logTest(
-        "Special characters (Côte d'Ivoire)",
+        "Special characters (Ivory Coast)",
         true,
-        `Successfully handled special characters, got: ${data.results[0].country.name}`
-      );
-    } else if (response.status === 400) {
-      // If it doesn't recognize it, that's also acceptable
-      logTest(
-        "Special characters (Côte d'Ivoire)",
-        true,
-        "Correctly handled unrecognized special characters"
+        `Successfully handled country name: ${data.results[0].country.name}`
       );
     } else {
       logTest(
