@@ -20,6 +20,7 @@ const pdfExportSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Search countries endpoint
   app.get("/api/search", async (req, res) => {
+    const startTime = Date.now();
     try {
       const { countries } = req.query;
       
@@ -60,6 +61,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process only valid countries
       const validCountryNames = validationResults.map(result => result.normalizedName!);
       
+      let cacheHits = 0;
+      let cacheMisses = 0;
+      
       const fetchPromises = validCountryNames.map(async (countryName) => {
         // Add to scheduler refresh list
         scheduler.addCountryToRefresh(countryName);
@@ -67,8 +71,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if we have cached data, if not fetch it
         let countryData = await storage.getCountryData(countryName);
         if (!countryData) {
+          cacheMisses++;
           await dataFetcher.fetchAllCountryData(countryName);
           countryData = await storage.getCountryData(countryName);
+        } else {
+          cacheHits++;
         }
         
         return countryData;
@@ -76,6 +83,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results = await Promise.all(fetchPromises);
       const validResults = results.filter(result => result !== undefined);
+
+      const elapsedTime = Date.now() - startTime;
+      console.log(`[Search Performance] Query: "${countries}" | Time: ${elapsedTime}ms | Cache hits: ${cacheHits}/${validCountryNames.length} | Cache misses: ${cacheMisses}`);
 
       res.json({
         results: validResults,
