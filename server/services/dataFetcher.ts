@@ -16,6 +16,10 @@ export class DataFetcher {
   // Cache for State Department threat levels (refreshed every 24 hours)
   private threatLevelCache: ThreatLevelCache | null = null;
   private readonly THREAT_LEVEL_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  
+  // System CA bundle loaded once at startup
+  private caBundle: Buffer | null = null;
+  private caBundleLoaded = false;
 
   // Comprehensive list of valid countries and territories
   private validCountries = new Set([
@@ -707,6 +711,25 @@ export class DataFetcher {
   }
 
   /**
+   * Loads system CA bundle once at startup for secure HTTPS requests
+   */
+  private loadCABundle(): void {
+    if (this.caBundleLoaded) return;
+    
+    try {
+      const fs = require('fs');
+      this.caBundle = fs.readFileSync('/etc/ssl/certs/ca-certificates.crt');
+      console.log('[State Dept API] Loaded system CA bundle for secure SSL verification');
+      this.caBundleLoaded = true;
+    } catch (error) {
+      console.error('[State Dept API] CRITICAL: Cannot load system CA bundle - SSL verification will fail');
+      console.error('[State Dept API] Will use fallback threat levels only');
+      this.caBundleLoaded = true; // Mark as loaded to prevent retries
+      this.caBundle = null;
+    }
+  }
+
+  /**
    * Fetches current threat levels from official State Department API
    * Returns a map of country names (lowercase) to threat levels (1-4)
    * Data is cached for 24 hours to minimize API calls
@@ -717,15 +740,73 @@ export class DataFetcher {
       return this.threatLevelCache.levels;
     }
 
-    try {
-      const response = await fetch('https://cadataapi.state.gov/api/TravelAdvisories');
-      
-      if (!response.ok) {
-        console.error(`State Dept API returned status ${response.status}`);
-        return this.getFallbackThreatLevels();
-      }
+    // Load CA bundle if not already loaded
+    if (!this.caBundleLoaded) {
+      this.loadCABundle();
+    }
 
-      const data = await response.json();
+    // If CA bundle couldn't be loaded, use fallback immediately
+    if (!this.caBundle) {
+      console.warn('[State Dept API] CA bundle unavailable, using fallback threat levels');
+      return this.getFallbackThreatLevels();
+    }
+
+    try {
+      const https = await import('https');
+      const url = 'https://cadataapi.state.gov/api/TravelAdvisories';
+      
+      const data: any = await new Promise((resolve, reject) => {
+        let cleanedUp = false;
+        let req: any = null;
+
+        const cleanup = (err?: Error) => {
+          if (cleanedUp) return; // Prevent double cleanup
+          cleanedUp = true;
+          
+          clearTimeout(requestTimeout);
+          if (req && !req.destroyed) {
+            req.destroy();
+          }
+          
+          if (err) reject(err);
+        };
+
+        const requestTimeout = setTimeout(() => {
+          cleanup(new Error('Request timeout after 30 seconds'));
+        }, 30000);
+
+        const options = {
+          ca: this.caBundle!,
+          rejectUnauthorized: true
+        };
+        
+        req = https.get(url, options, (res) => {
+          // Check for successful HTTP status
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            cleanup(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+            return;
+          }
+          
+          let rawData = '';
+          res.on('data', (chunk) => rawData += chunk);
+          res.on('end', () => {
+            cleanup();
+            try {
+              const parsed = JSON.parse(rawData);
+              if (!Array.isArray(parsed)) {
+                return reject(new Error('Expected JSON array from API'));
+              }
+              resolve(parsed);
+            } catch (e) {
+              reject(new Error(`JSON parse error: ${e instanceof Error ? e.message : 'unknown'}`));
+            }
+          });
+          res.on('error', (err) => cleanup(err));
+        });
+        
+        req.on('error', (err: Error) => cleanup(err));
+      });
+
       const levels = new Map<string, number>();
 
       for (const advisory of data) {
@@ -752,23 +833,38 @@ export class DataFetcher {
       return levels;
 
     } catch (error) {
-      console.error('Error fetching State Dept threat levels:', error);
+      console.error('[State Dept API] Failed to fetch threat levels:', error instanceof Error ? error.message : 'unknown error');
+      console.log('[State Dept API] Falling back to hardcoded threat level defaults');
       return this.getFallbackThreatLevels();
     }
   }
 
   private getFallbackThreatLevels(): Map<string, number> {
+    // Fallback threat levels based on US State Department data (October 2025)
+    // These are used when the official API is unavailable
     const fallbackLevels = new Map<string, number>([
+      // Level 4: Do Not Travel
       ["afghanistan", 4], ["iraq", 4], ["syria", 4], ["yemen", 4], ["libya", 4], ["somalia", 4],
-      ["iran", 4], ["north korea", 4], ["venezuela", 4], ["myanmar", 4],
+      ["iran", 4], ["north korea", 4], ["venezuela", 4], ["myanmar", 4], ["russia", 4], ["belarus", 4],
+      ["sudan", 4], ["south sudan", 4],
+      
+      // Level 3: Reconsider Travel
       ["ukraine", 3], ["lebanon", 3], ["pakistan", 3], ["colombia", 3], ["mexico", 3],
       ["egypt", 3], ["turkey", 3], ["haiti", 3], ["mali", 3], ["nigeria", 3],
+      ["nicaragua", 3], ["honduras", 3], ["el salvador", 3], ["papua new guinea", 3],
+      
+      // Level 2: Exercise Increased Caution
       ["india", 2], ["philippines", 2], ["kenya", 2], ["indonesia", 2], ["brazil", 2],
-      ["south africa", 2], ["russia", 2], ["china", 2], ["belarus", 2], ["ethiopia", 2],
+      ["south africa", 2], ["china", 2], ["ethiopia", 2], ["saudi arabia", 2],
+      ["thailand", 2], ["vietnam", 2], ["cambodia", 2], ["laos", 2], ["bangladesh", 2],
+      ["jamaica", 2], ["trinidad and tobago", 2], ["bolivia", 2],
+      
+      // Level 1: Exercise Normal Precautions
       ["japan", 1], ["south korea", 1], ["singapore", 1], ["australia", 1], ["new zealand", 1],
       ["canada", 1], ["united kingdom", 1], ["germany", 1], ["france", 1], ["italy", 1],
       ["spain", 1], ["netherlands", 1], ["sweden", 1], ["norway", 1], ["denmark", 1],
-      ["thailand", 2], ["vietnam", 2], ["cambodia", 2], ["laos", 2],
+      ["ireland", 1], ["switzerland", 1], ["austria", 1], ["belgium", 1], ["portugal", 1],
+      ["greece", 1], ["poland", 1], ["czech republic", 1], ["finland", 1], ["iceland", 1],
     ]);
     return fallbackLevels;
   }
