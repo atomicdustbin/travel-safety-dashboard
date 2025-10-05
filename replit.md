@@ -20,6 +20,10 @@ Preferred communication style: Simple, everyday language.
 - **Express.js Server**: RESTful API server with TypeScript
 - **Database ORM**: Drizzle ORM for type-safe database operations with PostgreSQL
 - **Data Storage**: Abstracted storage interface supporting both in-memory (development) and PostgreSQL (production)
+  - **Connection Validation**: Database connections are tested with 5-second timeout before route registration
+  - **Graceful Fallback**: Automatically falls back to in-memory storage if database connection fails
+  - **Startup Logging**: Clear console messages show database connection status and storage mode
+  - **Health Monitoring**: `/api/status` endpoint reports database connection health
 - **Data Fetching Services**: Modular services for fetching data from external travel advisory APIs
 - **Background Scheduler**: Automated data refresh system with three schedules:
   - Alerts refresh: Every 6 hours for recently accessed countries
@@ -30,9 +34,10 @@ Preferred communication style: Simple, everyday language.
 ## Database Design
 - **Countries Table**: Core country information (name, code, flag URL)
 - **Alerts Table**: Travel advisories and security alerts with severity levels, includes AI-enhanced fields (keyRisks, safetyRecommendations, specificAreas)
-- **Background Info Table**: Demographic and economic country data
+- **Background Info Table**: Demographic and economic country data with unique constraint on countryId
 - **Bulk Jobs Table**: Tracks weekly download jobs with progress metrics, status, and error logs
 - **Relational Structure**: Foreign key relationships linking alerts and background info to countries
+- **Error Recovery**: Production-ready error handling prevents server crashes from database connection failures
 
 ## API Structure
 - **Search Endpoint**: `/api/search` - Accepts comma-separated country names and returns comprehensive country data
