@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { SearchSection } from "@/components/SearchSection";
 import { CountryCard } from "@/components/CountryCard";
 import { LoadingState } from "@/components/LoadingState";
 import { ExportButton } from "@/components/ExportButton";
 import { BulkRefreshButton } from "@/components/BulkRefreshButton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Globe, AlertCircle, Search } from "lucide-react";
+import { RefreshCw, Globe, AlertCircle, Search, List } from "lucide-react";
 import { type SearchResult } from "@shared/schema";
 
 export default function Home() {
@@ -71,6 +72,17 @@ export default function Home() {
               <span className="text-sm text-muted-foreground hidden md:block" data-testid="text-last-updated">
                 Last updated: {currentTime}
               </span>
+              <Link href="/countries">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                  data-testid="link-countries"
+                >
+                  <List className="w-4 h-4" />
+                  <span className="hidden sm:inline">View All Countries</span>
+                </Button>
+              </Link>
               <BulkRefreshButton />
               <Button
                 variant="ghost"
