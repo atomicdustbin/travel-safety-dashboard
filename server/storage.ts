@@ -1,4 +1,4 @@
-import { type Country, type Alert, type BackgroundInfo, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type CountryData } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type BulkJob, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type CountryData } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -20,17 +20,25 @@ export interface IStorage {
   // Combined operations
   getCountryData(countryName: string): Promise<CountryData | undefined>;
   searchCountries(countryNames: string[]): Promise<CountryData[]>;
+
+  // Bulk Jobs
+  getBulkJob(id: string): Promise<BulkJob | undefined>;
+  createBulkJob(job: InsertBulkJob): Promise<BulkJob>;
+  updateBulkJob(id: string, updates: Partial<BulkJob>): Promise<BulkJob | undefined>;
+  getAllBulkJobs(limit?: number): Promise<BulkJob[]>;
 }
 
 export class MemStorage implements IStorage {
   private countries: Map<string, Country>;
   private alerts: Map<string, Alert>;
   private backgroundInfo: Map<string, BackgroundInfo>;
+  private bulkJobs: Map<string, BulkJob>;
 
   constructor() {
     this.countries = new Map();
     this.alerts = new Map();
     this.backgroundInfo = new Map();
+    this.bulkJobs = new Map();
   }
 
   // Helper to normalize arrays for type safety
@@ -166,6 +174,36 @@ export class MemStorage implements IStorage {
     }
     
     return results;
+  }
+
+  async getBulkJob(id: string): Promise<BulkJob | undefined> {
+    return this.bulkJobs.get(id);
+  }
+
+  async createBulkJob(insertJob: InsertBulkJob): Promise<BulkJob> {
+    const job: BulkJob = {
+      ...insertJob,
+      completedAt: insertJob.completedAt || null,
+      errorLog: (insertJob.errorLog || null) as { country: string; error: string; }[] | null,
+    };
+    this.bulkJobs.set(job.id, job);
+    return job;
+  }
+
+  async updateBulkJob(id: string, updates: Partial<BulkJob>): Promise<BulkJob | undefined> {
+    const job = this.bulkJobs.get(id);
+    if (!job) return undefined;
+
+    const updated = { ...job, ...updates };
+    this.bulkJobs.set(id, updated);
+    return updated;
+  }
+
+  async getAllBulkJobs(limit?: number): Promise<BulkJob[]> {
+    const jobs = Array.from(this.bulkJobs.values());
+    // Sort by startedAt descending (most recent first)
+    jobs.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    return limit ? jobs.slice(0, limit) : jobs;
   }
 }
 

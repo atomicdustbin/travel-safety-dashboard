@@ -21,25 +21,41 @@ Preferred communication style: Simple, everyday language.
 - **Database ORM**: Drizzle ORM for type-safe database operations with PostgreSQL
 - **Data Storage**: Abstracted storage interface supporting both in-memory (development) and PostgreSQL (production)
 - **Data Fetching Services**: Modular services for fetching data from external travel advisory APIs
-- **Background Scheduler**: Automated data refresh system for keeping travel advisories current
+- **Background Scheduler**: Automated data refresh system with three schedules:
+  - Alerts refresh: Every 6 hours for recently accessed countries
+  - Background data refresh: Every 7 days for country metadata
+  - **Weekly Bulk Download**: Every Sunday at 1 AM for all US State Department advisories (200+ countries)
+- **Bulk Download Service**: Manages large-scale data downloads with progress tracking, error recovery, and concurrency control
 
 ## Database Design
 - **Countries Table**: Core country information (name, code, flag URL)
-- **Alerts Table**: Travel advisories and security alerts with severity levels
+- **Alerts Table**: Travel advisories and security alerts with severity levels, includes AI-enhanced fields (keyRisks, safetyRecommendations, specificAreas)
 - **Background Info Table**: Demographic and economic country data
+- **Bulk Jobs Table**: Tracks weekly download jobs with progress metrics, status, and error logs
 - **Relational Structure**: Foreign key relationships linking alerts and background info to countries
 
 ## API Structure
 - **Search Endpoint**: `/api/search` - Accepts comma-separated country names and returns comprehensive country data
+- **PDF Export**: `/api/export/pdf` - Generates formatted PDF reports with AI-enhanced travel advisories
+- **Bulk Download Management**:
+  - `POST /api/refresh-advisories` - Manually trigger bulk download of all US State Dept advisories
+  - `GET /api/refresh-status/:jobId` - Check progress of running or completed bulk download jobs
+  - `GET /api/refresh-history` - View history of past bulk download jobs
+  - `POST /api/refresh-cancel/:jobId` - Cancel a running bulk download job
 - **RESTful Design**: Clean API design following REST principles
 - **Error Handling**: Centralized error handling with appropriate HTTP status codes
 - **Request Logging**: Middleware for logging API requests and responses
 
 ## Data Management
 - **Multi-Source Aggregation**: Combines data from US State Department, UK FCDO, and other travel advisory sources
-- **Automatic Refresh**: Scheduled updates every 6 hours for alerts, weekly for background data
+- **Automatic Refresh**: Three-tier scheduling system:
+  - Recently accessed countries: Every 6 hours
+  - Background metadata: Every 7 days
+  - **Complete US State Dept database**: Weekly (Sundays at 1 AM) with AI enhancement for all 200+ countries
+- **AI Enhancement**: ChatGPT integration analyzes full advisory pages to extract key risks, safety recommendations, and specific areas of concern
 - **Caching Strategy**: In-memory storage for development, PostgreSQL for production with query optimization
 - **Data Validation**: Zod schemas for runtime type checking and validation
+- **Progress Tracking**: Real-time progress monitoring for bulk downloads with error recovery and job persistence
 
 # External Dependencies
 

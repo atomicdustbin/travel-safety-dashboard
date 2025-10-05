@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
+import { bulkDownloadService } from "./services/bulkDownloadService";
 import { generatePDFReport } from "./pdfService";
 import { type SearchResult } from "@shared/schema";
 import { z } from "zod";
@@ -226,7 +227,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lastUpdated: new Date().toISOString(),
       alertRefreshInterval: "6 hours",
       backgroundRefreshInterval: "7 days",
+      weeklyBulkDownload: "Sundays at 1 AM",
     });
+  });
+
+  // Start bulk refresh of all US State Dept advisories
+  app.post("/api/refresh-advisories", async (req, res) => {
+    try {
+      const jobId = await bulkDownloadService.downloadAllStateDeptAdvisories();
+      
+      res.json({
+        message: "Bulk download started successfully",
+        jobId,
+        status: "running",
+      });
+    } catch (error) {
+      console.error("Bulk download error:", error);
+      res.status(500).json({ error: "Failed to start bulk download" });
+    }
+  });
+
+  // Get progress of a bulk download job
+  app.get("/api/refresh-status/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      
+      // First check in-memory progress
+      const memoryProgress = bulkDownloadService.getJobProgress(jobId);
+      if (memoryProgress) {
+        return res.json(memoryProgress);
+      }
+
+      // If not in memory, check database
+      const dbJob = await storage.getBulkJob(jobId);
+      if (!dbJob) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Convert database job to progress format
+      const progress = {
+        jobId: dbJob.id,
+        status: dbJob.status as 'running' | 'completed' | 'failed' | 'cancelled',
+        totalCountries: dbJob.totalCountries,
+        processedCountries: dbJob.processedCountries,
+        failedCountries: dbJob.failedCountries,
+        currentCountry: null,
+        startedAt: dbJob.startedAt,
+        completedAt: dbJob.completedAt,
+        errors: dbJob.errorLog || [],
+      };
+
+      res.json(progress);
+    } catch (error) {
+      console.error("Get job progress error:", error);
+      res.status(500).json({ error: "Failed to get job progress" });
+    }
+  });
+
+  // Get recent bulk download jobs
+  app.get("/api/refresh-history", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const jobs = await storage.getAllBulkJobs(limit);
+      
+      res.json({
+        jobs,
+        total: jobs.length,
+      });
+    } catch (error) {
+      console.error("Get job history error:", error);
+      res.status(500).json({ error: "Failed to get job history" });
+    }
+  });
+
+  // Cancel a running bulk download job
+  app.post("/api/refresh-cancel/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const cancelled = await bulkDownloadService.cancelJob(jobId);
+      
+      if (!cancelled) {
+        return res.status(404).json({ error: "Job not found or not running" });
+      }
+
+      res.json({
+        message: "Job cancelled successfully",
+        jobId,
+      });
+    } catch (error) {
+      console.error("Cancel job error:", error);
+      res.status(500).json({ error: "Failed to cancel job" });
+    }
   });
 
   const httpServer = createServer(app);

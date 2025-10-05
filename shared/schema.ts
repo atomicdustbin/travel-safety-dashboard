@@ -42,6 +42,17 @@ export const backgroundInfo = pgTable("background_info", {
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
+export const bulkJobs = pgTable("bulk_jobs", {
+  id: varchar("id").primaryKey(),
+  startedAt: timestamp("started_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  status: text("status").notNull(), // 'running', 'completed', 'failed', 'cancelled'
+  totalCountries: integer("total_countries").notNull(),
+  processedCountries: integer("processed_countries").notNull().default(0),
+  failedCountries: integer("failed_countries").notNull().default(0),
+  errorLog: json("error_log").$type<Array<{ country: string; error: string }>>(),
+});
+
 // Insert schemas
 export const insertCountrySchema = createInsertSchema(countries).omit({
   lastUpdated: true,
@@ -57,13 +68,17 @@ export const insertBackgroundInfoSchema = createInsertSchema(backgroundInfo).omi
   lastUpdated: true,
 });
 
+export const insertBulkJobSchema = createInsertSchema(bulkJobs);
+
 // Types
 export type Country = typeof countries.$inferSelect;
 export type Alert = typeof alerts.$inferSelect;
 export type BackgroundInfo = typeof backgroundInfo.$inferSelect;
+export type BulkJob = typeof bulkJobs.$inferSelect;
 export type InsertCountry = z.infer<typeof insertCountrySchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type InsertBackgroundInfo = z.infer<typeof insertBackgroundInfoSchema>;
+export type InsertBulkJob = z.infer<typeof insertBulkJobSchema>;
 
 // Combined types for API responses
 export type CountryData = {
