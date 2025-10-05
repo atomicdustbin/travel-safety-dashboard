@@ -6,7 +6,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { ExportButton } from "@/components/ExportButton";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Globe, AlertCircle } from "lucide-react";
+import { RefreshCw, Globe, AlertCircle, Search } from "lucide-react";
 import { type SearchResult } from "@shared/schema";
 
 export default function Home() {

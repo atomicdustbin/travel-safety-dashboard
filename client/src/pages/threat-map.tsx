@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, GeoJSON, Popup } from "react-leaflet";
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
-import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, ArrowLeft, List, Globe, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, Globe } from "lucide-react";
+import { Navigation } from "@/components/Navigation";
 import type { GeoJsonObject } from "geojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -173,38 +172,15 @@ export default function ThreatMap() {
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center space-x-2"
-                  data-testid="link-home"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                  <span className="hidden sm:inline">Back to Search</span>
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <Globe className="w-8 h-8 text-primary" />
-                <h1 className="text-xl font-bold text-foreground">Global Threat Map</h1>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Globe className="w-8 h-8 text-primary" />
+              <h1 className="text-xl font-bold text-foreground">Global Threat Map</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/countries">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center space-x-2"
-                  data-testid="link-countries"
-                >
-                  <List className="w-4 h-4" />
-                  <span className="hidden sm:inline">Country List</span>
-                </Button>
-              </Link>
               <span className="text-sm text-muted-foreground hidden md:block">
                 Real-time US State Dept advisories
               </span>
+              <Navigation />
             </div>
           </div>
         </div>

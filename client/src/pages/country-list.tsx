@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Navigation } from "@/components/Navigation";
 import {
   Table,
   TableBody,
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Globe, ArrowLeft, ArrowUp, ArrowDown, AlertCircle, X, Map } from "lucide-react";
+import { Globe, ArrowUp, ArrowDown, AlertCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface CountryListItem {
@@ -174,38 +175,15 @@ export default function CountryList() {
       <header className="bg-card border-b border-border sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center space-x-2"
-                  data-testid="link-home"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                  <span className="hidden sm:inline">Back to Search</span>
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <Globe className="w-8 h-8 text-primary" />
-                <h1 className="text-xl font-bold text-foreground">Cached Countries</h1>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Globe className="w-8 h-8 text-primary" />
+              <h1 className="text-xl font-bold text-foreground">Cached Countries</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/map">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center space-x-2"
-                  data-testid="link-map"
-                >
-                  <Map className="w-4 h-4" />
-                  <span className="hidden sm:inline">Threat Map</span>
-                </Button>
-              </Link>
               <span className="text-sm text-muted-foreground" data-testid="text-country-count">
                 {countries.length} {countries.length === 1 ? "country" : "countries"}
               </span>
+              <Navigation />
             </div>
           </div>
         </div>
@@ -321,6 +299,19 @@ export default function CountryList() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        )}
+
+        {/* Bulk Refresh Link */}
+        {!isLoading && !error && countries.length > 0 && (
+          <div className="mt-8 text-center pb-8">
+            <button
+              onClick={() => window.location.href = '/'}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors underline cursor-pointer"
+              data-testid="link-refresh-data"
+            >
+              Refresh US State Dept. Data
+            </button>
           </div>
         )}
       </main>
