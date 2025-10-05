@@ -4,6 +4,7 @@ import { SearchSection } from "@/components/SearchSection";
 import { CountryCard } from "@/components/CountryCard";
 import { LoadingState } from "@/components/LoadingState";
 import { ExportButton } from "@/components/ExportButton";
+import { BulkRefreshButton } from "@/components/BulkRefreshButton";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Globe, AlertCircle, Search } from "lucide-react";
 import { type SearchResult } from "@shared/schema";
@@ -67,9 +68,10 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-muted-foreground hidden sm:block" data-testid="text-last-updated">
+              <span className="text-sm text-muted-foreground hidden md:block" data-testid="text-last-updated">
                 Last updated: {currentTime}
               </span>
+              <BulkRefreshButton />
               <Button
                 variant="ghost"
                 size="sm"
@@ -214,7 +216,8 @@ export default function Home() {
             <div>
               <h3 className="font-semibold text-foreground mb-3">Update Frequency</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• Alert data: Every 6 hours</li>
+                <li>• US State Dept (all countries): Weekly (Sundays 1 AM) with AI enhancement</li>
+                <li>• Recently accessed countries: Every 6 hours</li>
                 <li>• Background data: Weekly</li>
                 <li>• Earthquake data: Real-time</li>
               </ul>
