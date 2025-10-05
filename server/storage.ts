@@ -1,7 +1,7 @@
-import { type Country, type Alert, type BackgroundInfo, type BulkJob, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type CountryData, countries, alerts, backgroundInfo, bulkJobs } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type BulkJob, type JobCountryProgress, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type InsertJobCountryProgress, type CountryData, countries, alerts, backgroundInfo, bulkJobs, jobCountryProgress } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { waitForDb, getDatabaseStatus } from "./db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 
 export interface IStorage {
   // Countries
@@ -29,6 +29,14 @@ export interface IStorage {
   createBulkJob(job: InsertBulkJob): Promise<BulkJob>;
   updateBulkJob(id: string, updates: Partial<BulkJob>): Promise<BulkJob | undefined>;
   getAllBulkJobs(limit?: number): Promise<BulkJob[]>;
+  getLastRunDate(): Promise<Date | null>;
+  
+  // Job Country Progress
+  createJobCountryProgress(progress: import("@shared/schema").InsertJobCountryProgress): Promise<import("@shared/schema").JobCountryProgress>;
+  updateJobCountryProgress(id: string, updates: Partial<import("@shared/schema").JobCountryProgress>): Promise<import("@shared/schema").JobCountryProgress | undefined>;
+  getJobCountryProgress(jobId: string): Promise<import("@shared/schema").JobCountryProgress[]>;
+  getLastProcessedCountry(jobId: string): Promise<import("@shared/schema").JobCountryProgress | undefined>;
+  updateJobWithTransaction(jobId: string, countryName: string, countryStatus: 'completed' | 'failed', error?: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -36,12 +44,14 @@ export class MemStorage implements IStorage {
   private alerts: Map<string, Alert>;
   private backgroundInfo: Map<string, BackgroundInfo>;
   private bulkJobs: Map<string, BulkJob>;
+  private jobProgress: Map<string, JobCountryProgress>;
 
   constructor() {
     this.countries = new Map();
     this.alerts = new Map();
     this.backgroundInfo = new Map();
     this.bulkJobs = new Map();
+    this.jobProgress = new Map();
   }
 
   // Helper to normalize arrays for type safety
@@ -210,6 +220,7 @@ export class MemStorage implements IStorage {
       failedCountries: insertJob.failedCountries || 0,
       completedAt: insertJob.completedAt || null,
       errorLog: (insertJob.errorLog || null) as { country: string; error: string; }[] | null,
+      lastRunDate: insertJob.lastRunDate || null,
     };
     this.bulkJobs.set(job.id, job);
     return job;
@@ -229,6 +240,100 @@ export class MemStorage implements IStorage {
     // Sort by startedAt descending (most recent first)
     jobs.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
     return limit ? jobs.slice(0, limit) : jobs;
+  }
+
+  async getLastRunDate(): Promise<Date | null> {
+    const jobs = await this.getAllBulkJobs();
+    const completedJobs = jobs.filter(job => job.status === 'completed' && job.lastRunDate);
+    if (completedJobs.length === 0) return null;
+    const mostRecent = completedJobs.sort((a, b) => 
+      (b.lastRunDate?.getTime() || 0) - (a.lastRunDate?.getTime() || 0)
+    )[0];
+    return mostRecent.lastRunDate || null;
+  }
+
+  async createJobCountryProgress(insertProgress: InsertJobCountryProgress): Promise<JobCountryProgress> {
+    const progress: JobCountryProgress = {
+      id: randomUUID(),
+      ...insertProgress,
+      startedAt: insertProgress.startedAt || null,
+      completedAt: insertProgress.completedAt || null,
+      error: insertProgress.error || null,
+      retryCount: insertProgress.retryCount || 0,
+    };
+    this.jobProgress.set(progress.id, progress);
+    return progress;
+  }
+
+  async updateJobCountryProgress(id: string, updates: Partial<JobCountryProgress>): Promise<JobCountryProgress | undefined> {
+    const progress = this.jobProgress.get(id);
+    if (!progress) return undefined;
+
+    const updated = { ...progress, ...updates };
+    this.jobProgress.set(id, updated);
+    return updated;
+  }
+
+  async getJobCountryProgress(jobId: string): Promise<JobCountryProgress[]> {
+    return Array.from(this.jobProgress.values()).filter(p => p.jobId === jobId);
+  }
+
+  async getLastProcessedCountry(jobId: string): Promise<JobCountryProgress | undefined> {
+    const progresses = await this.getJobCountryProgress(jobId);
+    const completed = progresses.filter(p => p.status === 'completed' || p.status === 'failed');
+    if (completed.length === 0) return undefined;
+    
+    // Sort by completedAt descending to get the most recent
+    completed.sort((a, b) => {
+      const aTime = a.completedAt?.getTime() || 0;
+      const bTime = b.completedAt?.getTime() || 0;
+      return bTime - aTime;
+    });
+    
+    return completed[0];
+  }
+
+  async updateJobWithTransaction(jobId: string, countryName: string, countryStatus: 'completed' | 'failed', error?: string): Promise<void> {
+    // For in-memory storage, we just do the operations sequentially (no real transactions)
+    const job = await this.getBulkJob(jobId);
+    if (!job) {
+      throw new Error(`Job ${jobId} not found`);
+    }
+
+    // Update or create country progress
+    const existing = Array.from(this.jobProgress.values()).find(
+      p => p.jobId === jobId && p.countryName === countryName
+    );
+
+    if (existing) {
+      await this.updateJobCountryProgress(existing.id, {
+        status: countryStatus,
+        completedAt: new Date(),
+        error: error || null,
+      });
+    } else {
+      await this.createJobCountryProgress({
+        jobId,
+        countryName,
+        status: countryStatus,
+        startedAt: new Date(),
+        completedAt: new Date(),
+        error: error || null,
+        retryCount: 0,
+      });
+    }
+
+    // Update job counts
+    if (countryStatus === 'completed') {
+      await this.updateBulkJob(jobId, {
+        processedCountries: job.processedCountries + 1,
+      });
+    } else if (countryStatus === 'failed') {
+      await this.updateBulkJob(jobId, {
+        processedCountries: job.processedCountries + 1,
+        failedCountries: job.failedCountries + 1,
+      });
+    }
   }
 }
 
@@ -379,6 +484,94 @@ export class DBStorage implements IStorage {
       return await query.limit(limit);
     }
     return await query;
+  }
+
+  async getLastRunDate(): Promise<Date | null> {
+    const result = await this.db.select().from(bulkJobs)
+      .where(eq(bulkJobs.status, 'completed'))
+      .orderBy(bulkJobs.lastRunDate)
+      .limit(1);
+    
+    return result[0]?.lastRunDate || null;
+  }
+
+  async createJobCountryProgress(insertProgress: InsertJobCountryProgress): Promise<JobCountryProgress> {
+    const result = await this.db.insert(jobCountryProgress).values([insertProgress as any]).returning();
+    return result[0];
+  }
+
+  async updateJobCountryProgress(id: string, updates: Partial<JobCountryProgress>): Promise<JobCountryProgress | undefined> {
+    const result = await this.db.update(jobCountryProgress)
+      .set(updates)
+      .where(eq(jobCountryProgress.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getJobCountryProgress(jobId: string): Promise<JobCountryProgress[]> {
+    return await this.db.select().from(jobCountryProgress).where(eq(jobCountryProgress.jobId, jobId));
+  }
+
+  async getLastProcessedCountry(jobId: string): Promise<JobCountryProgress | undefined> {
+    const result = await this.db.select().from(jobCountryProgress)
+      .where(eq(jobCountryProgress.jobId, jobId))
+      .orderBy(jobCountryProgress.completedAt)
+      .limit(1);
+    
+    return result[0];
+  }
+
+  async updateJobWithTransaction(jobId: string, countryName: string, countryStatus: 'completed' | 'failed', error?: string): Promise<void> {
+    // Execute in a transaction for atomicity
+    await this.db.transaction(async (tx) => {
+      // Get current job
+      const job = await tx.select().from(bulkJobs).where(eq(bulkJobs.id, jobId)).limit(1);
+      if (job.length === 0) {
+        throw new Error(`Job ${jobId} not found`);
+      }
+
+      // Update or create country progress
+      const existing = await tx.select().from(jobCountryProgress)
+        .where(and(
+          eq(jobCountryProgress.jobId, jobId),
+          eq(jobCountryProgress.countryName, countryName)
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await tx.update(jobCountryProgress)
+          .set({
+            status: countryStatus,
+            completedAt: new Date(),
+            error: error || null,
+          })
+          .where(eq(jobCountryProgress.id, existing[0].id));
+      } else {
+        await tx.insert(jobCountryProgress).values({
+          jobId,
+          countryName,
+          status: countryStatus,
+          startedAt: new Date(),
+          completedAt: new Date(),
+          error: error || null,
+          retryCount: 0,
+        });
+      }
+
+      // Update job counts
+      const currentJob = job[0];
+      const updates: Partial<BulkJob> = {
+        processedCountries: currentJob.processedCountries + 1,
+      };
+
+      if (countryStatus === 'failed') {
+        updates.failedCountries = currentJob.failedCountries + 1;
+      }
+
+      await tx.update(bulkJobs)
+        .set(updates)
+        .where(eq(bulkJobs.id, jobId));
+    });
   }
 }
 
