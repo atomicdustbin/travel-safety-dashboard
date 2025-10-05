@@ -1,7 +1,7 @@
 import { type Country, type Alert, type BackgroundInfo, type BulkJob, type JobCountryProgress, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type InsertJobCountryProgress, type CountryData, countries, alerts, backgroundInfo, bulkJobs, jobCountryProgress } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { waitForDb, getDatabaseStatus } from "./db";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Countries
@@ -489,7 +489,7 @@ export class DBStorage implements IStorage {
   async getLastRunDate(): Promise<Date | null> {
     const result = await this.db.select().from(bulkJobs)
       .where(eq(bulkJobs.status, 'completed'))
-      .orderBy(bulkJobs.lastRunDate)
+      .orderBy(desc(bulkJobs.lastRunDate))
       .limit(1);
     
     return result[0]?.lastRunDate || null;
@@ -515,7 +515,7 @@ export class DBStorage implements IStorage {
   async getLastProcessedCountry(jobId: string): Promise<JobCountryProgress | undefined> {
     const result = await this.db.select().from(jobCountryProgress)
       .where(eq(jobCountryProgress.jobId, jobId))
-      .orderBy(jobCountryProgress.completedAt)
+      .orderBy(desc(jobCountryProgress.completedAt))
       .limit(1);
     
     return result[0];
