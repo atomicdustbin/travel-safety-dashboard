@@ -20,6 +20,10 @@ const pdfExportSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Wait for storage to be initialized before registering routes
   await waitForStorage();
+  
+  // Initialize bulk download service to recover any orphaned jobs
+  await bulkDownloadService.initialize();
+  
   // Search countries endpoint
   app.get("/api/search", async (req, res) => {
     const startTime = Date.now();

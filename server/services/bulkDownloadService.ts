@@ -19,6 +19,51 @@ class BulkDownloadService {
   private readonly DELAY_BETWEEN_COUNTRIES = 2000; // 2 seconds delay
   private readonly MAX_RETRIES = 3;
   private lastRunDate: Date | null = null; // Track last run to prevent duplicates
+  private initialized = false;
+
+  /**
+   * Initialize service and recover orphaned jobs
+   * Should be called once on server startup
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    console.log('[BulkDownload] Initializing service and checking for orphaned jobs...');
+
+    try {
+      // Get all running jobs from database
+      const allJobs = await storage.getAllBulkJobs();
+      const runningJobs = allJobs.filter(job => job.status === 'running');
+
+      if (runningJobs.length > 0) {
+        console.log(`[BulkDownload] Found ${runningJobs.length} orphaned job(s) from server restart`);
+
+        for (const job of runningJobs) {
+          // Mark orphaned jobs as failed with explanation
+          await storage.updateBulkJob(job.id, {
+            status: 'failed',
+            completedAt: new Date(),
+            errorLog: [
+              ...(job.errorLog || []),
+              { 
+                country: 'system', 
+                error: `Job interrupted by server restart after processing ${job.processedCountries}/${job.totalCountries} countries` 
+              }
+            ]
+          });
+          console.log(`[BulkDownload] Marked orphaned job ${job.id} as failed (${job.processedCountries}/${job.totalCountries} countries processed)`);
+        }
+      } else {
+        console.log('[BulkDownload] No orphaned jobs found');
+      }
+    } catch (error) {
+      console.error('[BulkDownload] Failed to check for orphaned jobs:', error);
+    }
+
+    this.initialized = true;
+  }
 
   /**
    * Get all valid countries that can be processed
