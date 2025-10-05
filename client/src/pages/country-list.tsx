@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/Navigation";
+import { BulkRefreshButton } from "@/components/BulkRefreshButton";
 import {
   Table,
   TableBody,
@@ -302,16 +303,13 @@ export default function CountryList() {
           </div>
         )}
 
-        {/* Bulk Refresh Link */}
+        {/* Bulk Refresh Section */}
         {!isLoading && !error && countries.length > 0 && (
           <div className="mt-8 text-center pb-8">
-            <button
-              onClick={() => window.location.href = '/'}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors underline cursor-pointer"
-              data-testid="link-refresh-data"
-            >
-              Refresh US State Dept. Data
-            </button>
+            <div className="text-xs text-muted-foreground mb-3">
+              Download latest advisories for all countries
+            </div>
+            <BulkRefreshButton />
           </div>
         )}
       </main>
