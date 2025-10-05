@@ -1,5 +1,7 @@
-import { type Country, type Alert, type BackgroundInfo, type BulkJob, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type CountryData } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type BulkJob, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type CountryData, countries, alerts, backgroundInfo, bulkJobs } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Countries
@@ -180,7 +182,7 @@ export class MemStorage implements IStorage {
   async getAllCountriesWithData(): Promise<CountryData[]> {
     const results: CountryData[] = [];
     
-    for (const country of this.countries.values()) {
+    for (const country of Array.from(this.countries.values())) {
       const alerts = await this.getAlertsByCountryId(country.id);
       const background = await this.getBackgroundInfoByCountryId(country.id);
       
@@ -204,6 +206,8 @@ export class MemStorage implements IStorage {
   async createBulkJob(insertJob: InsertBulkJob): Promise<BulkJob> {
     const job: BulkJob = {
       ...insertJob,
+      processedCountries: insertJob.processedCountries || 0,
+      failedCountries: insertJob.failedCountries || 0,
       completedAt: insertJob.completedAt || null,
       errorLog: (insertJob.errorLog || null) as { country: string; error: string; }[] | null,
     };
@@ -228,4 +232,148 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DBStorage implements IStorage {
+  async getCountry(id: string): Promise<Country | undefined> {
+    const result = await db.select().from(countries).where(eq(countries.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCountryByName(name: string): Promise<Country | undefined> {
+    const result = await db.select().from(countries).where(eq(countries.name, name)).limit(1);
+    return result[0];
+  }
+
+  async createCountry(insertCountry: InsertCountry): Promise<Country> {
+    const country: Country = {
+      ...insertCountry,
+      flagUrl: insertCountry.flagUrl || null,
+      lastUpdated: new Date(),
+    };
+    await db.insert(countries).values(country).onConflictDoUpdate({
+      target: countries.id,
+      set: { ...country, lastUpdated: new Date() }
+    });
+    return country;
+  }
+
+  async updateCountry(id: string, updates: Partial<Country>): Promise<Country | undefined> {
+    const result = await db.update(countries)
+      .set({ ...updates, lastUpdated: new Date() })
+      .where(eq(countries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAlertsByCountryId(countryId: string): Promise<Alert[]> {
+    return await db.select().from(alerts).where(eq(alerts.countryId, countryId));
+  }
+
+  async createAlert(insertAlert: InsertAlert): Promise<Alert> {
+    const result = await db.insert(alerts).values([insertAlert as any]).returning();
+    return result[0];
+  }
+
+  async deleteAlertsByCountryId(countryId: string): Promise<void> {
+    await db.delete(alerts).where(eq(alerts.countryId, countryId));
+  }
+
+  async getBackgroundInfoByCountryId(countryId: string): Promise<BackgroundInfo | undefined> {
+    const result = await db.select().from(backgroundInfo).where(eq(backgroundInfo.countryId, countryId)).limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateBackgroundInfo(insertInfo: InsertBackgroundInfo): Promise<BackgroundInfo> {
+    const result = await db.insert(backgroundInfo).values([insertInfo as any]).onConflictDoUpdate({
+      target: backgroundInfo.countryId,
+      set: insertInfo as any
+    }).returning();
+    return result[0];
+  }
+
+  async getCountryData(countryName: string): Promise<CountryData | undefined> {
+    const country = await this.getCountryByName(countryName);
+    if (!country) return undefined;
+
+    const [countryAlerts, background] = await Promise.all([
+      this.getAlertsByCountryId(country.id),
+      this.getBackgroundInfoByCountryId(country.id),
+    ]);
+
+    return {
+      country,
+      alerts: countryAlerts,
+      background: background || null,
+    };
+  }
+
+  async searchCountries(countryNames: string[]): Promise<CountryData[]> {
+    const uniqueNames = Array.from(new Set(countryNames));
+    const countriesResults = await db.select().from(countries).where(
+      inArray(countries.name, uniqueNames)
+    );
+
+    const results: CountryData[] = [];
+    for (const country of countriesResults) {
+      const [countryAlerts, background] = await Promise.all([
+        this.getAlertsByCountryId(country.id),
+        this.getBackgroundInfoByCountryId(country.id),
+      ]);
+
+      results.push({
+        country,
+        alerts: countryAlerts,
+        background: background || null,
+      });
+    }
+
+    return results;
+  }
+
+  async getAllCountriesWithData(): Promise<CountryData[]> {
+    const allCountries = await db.select().from(countries);
+    const results: CountryData[] = [];
+
+    for (const country of allCountries) {
+      const [countryAlerts, background] = await Promise.all([
+        this.getAlertsByCountryId(country.id),
+        this.getBackgroundInfoByCountryId(country.id),
+      ]);
+
+      results.push({
+        country,
+        alerts: countryAlerts,
+        background: background || null,
+      });
+    }
+
+    return results;
+  }
+
+  async getBulkJob(id: string): Promise<BulkJob | undefined> {
+    const result = await db.select().from(bulkJobs).where(eq(bulkJobs.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createBulkJob(insertJob: InsertBulkJob): Promise<BulkJob> {
+    const result = await db.insert(bulkJobs).values([insertJob as any]).returning();
+    return result[0];
+  }
+
+  async updateBulkJob(id: string, updates: Partial<BulkJob>): Promise<BulkJob | undefined> {
+    const result = await db.update(bulkJobs)
+      .set(updates)
+      .where(eq(bulkJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAllBulkJobs(limit?: number): Promise<BulkJob[]> {
+    const query = db.select().from(bulkJobs).orderBy(bulkJobs.startedAt);
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+}
+
+export const storage = process.env.DATABASE_URL ? new DBStorage() : new MemStorage();
