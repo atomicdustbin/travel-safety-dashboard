@@ -38,31 +38,96 @@ class BulkDownloadService {
       const runningJobs = allJobs.filter(job => job.status === 'running');
 
       if (runningJobs.length > 0) {
-        console.log(`[BulkDownload] Found ${runningJobs.length} orphaned job(s) from server restart`);
+        console.log(`[BulkDownload] Found ${runningJobs.length} running job(s) - attempting to resume`);
 
         for (const job of runningJobs) {
-          // Mark orphaned jobs as failed with explanation
-          await storage.updateBulkJob(job.id, {
-            status: 'failed',
-            completedAt: new Date(),
-            errorLog: [
-              ...(job.errorLog || []),
-              { 
-                country: 'system', 
-                error: `Job interrupted by server restart after processing ${job.processedCountries}/${job.totalCountries} countries` 
-              }
-            ]
+          console.log(`[BulkDownload] Resuming job ${job.id} (${job.processedCountries}/${job.totalCountries} countries processed)`);
+          
+          // Resume the job instead of marking it as failed
+          this.resumeJob(job.id).catch(error => {
+            console.error(`[BulkDownload] Failed to resume job ${job.id}:`, error);
           });
-          console.log(`[BulkDownload] Marked orphaned job ${job.id} as failed (${job.processedCountries}/${job.totalCountries} countries processed)`);
         }
       } else {
-        console.log('[BulkDownload] No orphaned jobs found');
+        console.log('[BulkDownload] No running jobs found');
       }
     } catch (error) {
       console.error('[BulkDownload] Failed to check for orphaned jobs:', error);
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * Resume a previously interrupted job
+   */
+  private async resumeJob(jobId: string): Promise<void> {
+    try {
+      // Get job details from database
+      const job = await storage.getBulkJob(jobId);
+      if (!job || job.status !== 'running') {
+        console.log(`[BulkDownload] Job ${jobId} cannot be resumed (status: ${job?.status})`);
+        return;
+      }
+
+      // Get list of already processed countries
+      const processedProgress = await storage.getJobCountryProgress(jobId);
+      const processedCountryNames = new Set(
+        processedProgress
+          .filter(p => p.status === 'completed' || p.status === 'failed')
+          .map(p => p.countryName)
+      );
+
+      console.log(`[BulkDownload] Job ${jobId} has ${processedCountryNames.size} countries already processed`);
+
+      // Get remaining countries to process
+      const allCountries = this.getValidCountries();
+      const remainingCountries = allCountries.filter(c => !processedCountryNames.has(c));
+
+      if (remainingCountries.length === 0) {
+        console.log(`[BulkDownload] Job ${jobId} is already complete, marking as completed`);
+        await storage.updateBulkJob(jobId, {
+          status: 'completed',
+          completedAt: new Date(),
+          lastRunDate: new Date(),
+        });
+        return;
+      }
+
+      console.log(`[BulkDownload] Resuming job ${jobId} with ${remainingCountries.length} remaining countries`);
+
+      // Create in-memory progress for UI/API
+      const progress: BulkDownloadProgress = {
+        jobId,
+        status: 'running',
+        totalCountries: job.totalCountries,
+        processedCountries: job.processedCountries,
+        failedCountries: job.failedCountries,
+        currentCountry: null,
+        startedAt: job.startedAt,
+        completedAt: null,
+        errors: job.errorLog || [],
+      };
+
+      this.activeJobs.set(jobId, progress);
+
+      // Process remaining countries
+      await this.processCountries(jobId, remainingCountries);
+    } catch (error) {
+      console.error(`[BulkDownload] Error resuming job ${jobId}:`, error);
+      
+      // Mark job as failed
+      await storage.updateBulkJob(jobId, {
+        status: 'failed',
+        completedAt: new Date(),
+        errorLog: [
+          { 
+            country: 'system', 
+            error: `Failed to resume job: ${error instanceof Error ? error.message : String(error)}` 
+          }
+        ]
+      });
+    }
   }
 
   /**
