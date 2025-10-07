@@ -14,6 +14,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/countries" component={CountryList} />
       <Route path="/map" component={ThreatMap} />
+      <Route path="/threat-map" component={ThreatMap} />
       <Route component={NotFound} />
     </Switch>
   );
