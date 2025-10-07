@@ -140,9 +140,8 @@ export default function ThreatMap() {
 
   const embassyRefreshMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('/api/embassies/refresh', {
-        method: 'POST',
-      }) as { message: string; count: number };
+      const response = await apiRequest('POST', '/api/embassies/refresh');
+      return await response.json() as { message: string; count: number };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/embassies"] });
