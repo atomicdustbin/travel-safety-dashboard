@@ -1,4 +1,4 @@
-import { type Country, type Alert, type BackgroundInfo, type BulkJob, type JobCountryProgress, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type InsertJobCountryProgress, type CountryData, countries, alerts, backgroundInfo, bulkJobs, jobCountryProgress } from "@shared/schema";
+import { type Country, type Alert, type BackgroundInfo, type BulkJob, type JobCountryProgress, type EmbassyConsulate, type InsertCountry, type InsertAlert, type InsertBackgroundInfo, type InsertBulkJob, type InsertJobCountryProgress, type InsertEmbassyConsulate, type CountryData, countries, alerts, backgroundInfo, bulkJobs, jobCountryProgress, embassiesConsulates } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { waitForDb, getDatabaseStatus } from "./db";
 import { eq, inArray, and, desc } from "drizzle-orm";
@@ -37,6 +37,13 @@ export interface IStorage {
   getJobCountryProgress(jobId: string): Promise<import("@shared/schema").JobCountryProgress[]>;
   getLastProcessedCountry(jobId: string): Promise<import("@shared/schema").JobCountryProgress | undefined>;
   updateJobWithTransaction(jobId: string, countryName: string, countryStatus: 'completed' | 'failed', error?: string): Promise<void>;
+  
+  // Embassies & Consulates
+  getEmbassiesByCountryCode(countryCode: string): Promise<EmbassyConsulate[]>;
+  getAllEmbassies(): Promise<EmbassyConsulate[]>;
+  createEmbassy(embassy: InsertEmbassyConsulate): Promise<EmbassyConsulate>;
+  deleteAllEmbassies(): Promise<void>;
+  bulkCreateEmbassies(embassies: InsertEmbassyConsulate[]): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -45,6 +52,7 @@ export class MemStorage implements IStorage {
   private backgroundInfo: Map<string, BackgroundInfo>;
   private bulkJobs: Map<string, BulkJob>;
   private jobProgress: Map<string, JobCountryProgress>;
+  private embassies: Map<string, EmbassyConsulate>;
 
   constructor() {
     this.countries = new Map();
@@ -52,6 +60,7 @@ export class MemStorage implements IStorage {
     this.backgroundInfo = new Map();
     this.bulkJobs = new Map();
     this.jobProgress = new Map();
+    this.embassies = new Map();
   }
 
   // Helper to normalize arrays for type safety
@@ -335,6 +344,40 @@ export class MemStorage implements IStorage {
       });
     }
   }
+
+  // Embassy & Consulate methods
+  async getEmbassiesByCountryCode(countryCode: string): Promise<EmbassyConsulate[]> {
+    return Array.from(this.embassies.values()).filter(
+      embassy => embassy.countryCode.toUpperCase() === countryCode.toUpperCase()
+    );
+  }
+
+  async getAllEmbassies(): Promise<EmbassyConsulate[]> {
+    return Array.from(this.embassies.values());
+  }
+
+  async createEmbassy(insertEmbassy: InsertEmbassyConsulate): Promise<EmbassyConsulate> {
+    const embassy: EmbassyConsulate = {
+      ...insertEmbassy,
+      streetAddress: insertEmbassy.streetAddress || null,
+      city: insertEmbassy.city || null,
+      phone: insertEmbassy.phone || null,
+      website: insertEmbassy.website || null,
+      lastUpdated: new Date(),
+    };
+    this.embassies.set(embassy.id, embassy);
+    return embassy;
+  }
+
+  async deleteAllEmbassies(): Promise<void> {
+    this.embassies.clear();
+  }
+
+  async bulkCreateEmbassies(embassies: InsertEmbassyConsulate[]): Promise<void> {
+    for (const embassy of embassies) {
+      await this.createEmbassy(embassy);
+    }
+  }
 }
 
 export class DBStorage implements IStorage {
@@ -572,6 +615,30 @@ export class DBStorage implements IStorage {
         .set(updates)
         .where(eq(bulkJobs.id, jobId));
     });
+  }
+
+  // Embassy & Consulate methods
+  async getEmbassiesByCountryCode(countryCode: string): Promise<EmbassyConsulate[]> {
+    return await this.db.select().from(embassiesConsulates)
+      .where(eq(embassiesConsulates.countryCode, countryCode.toUpperCase()));
+  }
+
+  async getAllEmbassies(): Promise<EmbassyConsulate[]> {
+    return await this.db.select().from(embassiesConsulates);
+  }
+
+  async createEmbassy(insertEmbassy: InsertEmbassyConsulate): Promise<EmbassyConsulate> {
+    const result = await this.db.insert(embassiesConsulates).values([insertEmbassy as any]).returning();
+    return result[0];
+  }
+
+  async deleteAllEmbassies(): Promise<void> {
+    await this.db.delete(embassiesConsulates);
+  }
+
+  async bulkCreateEmbassies(embassies: InsertEmbassyConsulate[]): Promise<void> {
+    if (embassies.length === 0) return;
+    await this.db.insert(embassiesConsulates).values(embassies as any[]);
   }
 }
 
