@@ -401,6 +401,15 @@ export default function ThreatMap() {
             )}
           </Button>
         </div>
+
+        <div className="absolute bottom-4 right-4 bg-card/95 backdrop-blur-sm border shadow-sm rounded px-3 py-2 z-[1000]" data-testid="contact-info">
+          <p className="text-xs text-muted-foreground">
+            For more information contact Matt Covington -{" "}
+            <a href="mailto:mattcov@gmail.com" className="text-primary hover:underline">
+              mattcov@gmail.com
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
