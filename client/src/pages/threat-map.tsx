@@ -377,35 +377,29 @@ export default function ThreatMap() {
               <span>No Data</span>
             </div>
           </div>
-          
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium">US Embassies</span>
-              </div>
-              <span className="text-xs text-muted-foreground">{embassyData?.count || 0}</span>
-            </div>
-            <Button
-              onClick={() => embassyRefreshMutation.mutate()}
-              disabled={embassyRefreshMutation.isPending}
-              size="sm"
-              className="w-full"
-              data-testid="button-refresh-embassies"
-            >
-              {embassyRefreshMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Sync Embassy Data
-                </>
-              )}
-            </Button>
-          </div>
+        </div>
+
+        <div className="absolute bottom-4 left-4 z-[1000]" data-testid="embassy-sync-controls">
+          <Button
+            onClick={() => embassyRefreshMutation.mutate()}
+            disabled={embassyRefreshMutation.isPending}
+            size="sm"
+            variant="secondary"
+            className="shadow-lg"
+            data-testid="button-refresh-embassies"
+          >
+            {embassyRefreshMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Building2 className="w-4 h-4 mr-2" />
+                Sync Embassies ({embassyData?.count || 0})
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
