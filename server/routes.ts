@@ -4,6 +4,7 @@ import { storage, waitForStorage } from "./storage";
 import { dataFetcher } from "./services/dataFetcher";
 import { scheduler } from "./services/scheduler";
 import { bulkDownloadService } from "./services/bulkDownloadService";
+import { embassyDataFetcher } from "./services/embassyFetcher";
 import { generatePDFReport } from "./pdfService";
 import { type SearchResult } from "@shared/schema";
 import { z } from "zod";
@@ -372,6 +373,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Cancel job error:", error);
       res.status(500).json({ error: "Failed to cancel job" });
+    }
+  });
+
+  // Get embassies and consulates for a country
+  app.get("/api/embassies/:countryCode", async (req, res) => {
+    try {
+      const { countryCode } = req.params;
+      
+      if (!countryCode || countryCode.length !== 2) {
+        return res.status(400).json({ error: "Valid 2-letter country code required" });
+      }
+
+      const embassies = await storage.getEmbassiesByCountryCode(countryCode.toUpperCase());
+      
+      res.json({
+        countryCode: countryCode.toUpperCase(),
+        embassies,
+        count: embassies.length,
+      });
+    } catch (error) {
+      console.error("Get embassies error:", error);
+      res.status(500).json({ error: "Failed to get embassy data" });
+    }
+  });
+
+  // Refresh all US embassy data worldwide
+  app.post("/api/embassies/refresh", async (req, res) => {
+    try {
+      console.log(`🏛️ Fetching all US embassy data from OpenStreetMap...`);
+      
+      const embassies = await embassyDataFetcher.fetchAllUSEmbassies();
+      
+      if (embassies.length === 0) {
+        return res.json({
+          message: `No US embassy data found`,
+          embassies: [],
+          count: 0,
+        });
+      }
+
+      // Clear existing data and save new data
+      await storage.deleteAllEmbassies();
+      await storage.bulkCreateEmbassies(embassies);
+      console.log(`✅ Saved ${embassies.length} US embassies worldwide`);
+      
+      res.json({
+        message: `Successfully fetched and saved ${embassies.length} US embassies`,
+        embassies,
+        count: embassies.length,
+      });
+    } catch (error) {
+      console.error("Refresh embassies error:", error);
+      res.status(500).json({ error: "Failed to refresh embassy data" });
+    }
+  });
+
+  // Get all embassies
+  app.get("/api/embassies", async (req, res) => {
+    try {
+      const embassies = await storage.getAllEmbassies();
+      
+      res.json({
+        embassies,
+        count: embassies.length,
+      });
+    } catch (error) {
+      console.error("Get all embassies error:", error);
+      res.status(500).json({ error: "Failed to get embassy data" });
     }
   });
 
