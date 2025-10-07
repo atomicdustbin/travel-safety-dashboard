@@ -224,7 +224,13 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-border mt-8 pt-6 text-center text-sm text-muted-foreground">
-            <p>This tool aggregates publicly available travel and safety information. Always consult official government sources for the most current travel guidance.</p>
+            <p className="mb-3">This tool aggregates publicly available travel and safety information. Always consult official government sources for the most current travel guidance.</p>
+            <p className="text-xs" data-testid="contact-info">
+              For more information contact Matt Covington -{" "}
+              <a href="mailto:mattcov@gmail.com" className="text-primary hover:underline">
+                mattcov@gmail.com
+              </a>
+            </p>
           </div>
         </div>
       </footer>

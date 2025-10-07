@@ -314,6 +314,18 @@ export default function CountryList() {
         )}
       </main>
 
+      {/* Footer */}
+      <footer className="bg-muted border-t border-border mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+          <p className="text-xs text-muted-foreground" data-testid="contact-info">
+            For more information contact Matt Covington -{" "}
+            <a href="mailto:mattcov@gmail.com" className="text-primary hover:underline">
+              mattcov@gmail.com
+            </a>
+          </p>
+        </div>
+      </footer>
+
       {/* AI Summary Dialog */}
       <Dialog open={!!selectedCountry} onOpenChange={(open) => !open && setSelectedCountry(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="dialog-ai-summary">
