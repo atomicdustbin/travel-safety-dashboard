@@ -31,15 +31,7 @@ export class EmbassyDataFetcher {
    * Fetch all US embassies and consulates from OpenStreetMap
    */
   async fetchAllUSEmbassies(): Promise<InsertEmbassyConsulate[]> {
-    const query = `
-      [out:json][timeout:120];
-      (
-        node["amenity"="embassy"]["country"="US"];
-        way["amenity"="embassy"]["country"="US"];
-        relation["amenity"="embassy"]["country"="US"];
-      );
-      out center;
-    `;
+    const query = '[out:json][timeout:120];(node["office"="diplomatic"]["country"="US"];way["office"="diplomatic"]["country"="US"];);out body center;';
 
     try {
       console.log('[EmbassyFetcher] Fetching US embassy/consulate data from OpenStreetMap...');

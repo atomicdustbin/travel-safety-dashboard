@@ -376,6 +376,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint to test OSM API directly (must be before :countryCode route)
+  app.get("/api/embassies/test-osm", async (req, res) => {
+    try {
+      const query = '[out:json][timeout:25];(node["office"="diplomatic"]["country"="US"];way["office"="diplomatic"]["country"="US"];);out body center;';
+      
+      const response = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+
+      const data = await response.json();
+      
+      res.json({
+        elementsCount: data.elements?.length || 0,
+        elements: data.elements?.slice(0, 3) || [], // First 3 elements for inspection
+        fullResponse: data,
+      });
+    } catch (error) {
+      console.error("OSM test error:", error);
+      res.status(500).json({ error: "Failed to test OSM API" });
+    }
+  });
+
   // Get embassies and consulates for a country
   app.get("/api/embassies/:countryCode", async (req, res) => {
     try {
