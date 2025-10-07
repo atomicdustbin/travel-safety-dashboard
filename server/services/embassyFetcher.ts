@@ -11,10 +11,16 @@ interface OverpassElement {
     amenity?: string;
     country?: string;
     diplomatic?: string;
+    target?: string;
     'addr:street'?: string;
     'addr:city'?: string;
     'addr:country'?: string;
+    'addr:housenumber'?: string;
+    'contact:street'?: string;
+    'contact:city'?: string;
+    'contact:housenumber'?: string;
     'contact:phone'?: string;
+    'contact:website'?: string;
     phone?: string;
     website?: string;
   };
@@ -31,7 +37,20 @@ export class EmbassyDataFetcher {
    * Fetch all US embassies and consulates from OpenStreetMap
    */
   async fetchAllUSEmbassies(): Promise<InsertEmbassyConsulate[]> {
-    const query = '[out:json][timeout:120];(node["office"="diplomatic"]["country"="US"];way["office"="diplomatic"]["country"="US"];);out body center;';
+    // Query for US diplomatic facilities using multiple tagging schemes
+    // - office=diplomatic with country=US (modern tagging)
+    // - office=diplomatic with target=* (embassies TO other countries, we filter for US later)
+    // - amenity=embassy with country=US (legacy tagging)
+    const query = `[out:json][timeout:120];
+      (
+        node["office"="diplomatic"]["country"="US"];
+        way["office"="diplomatic"]["country"="US"];
+        node["office"="diplomatic"]["target"];
+        way["office"="diplomatic"]["target"];
+        node["amenity"="embassy"]["country"="US"];
+        way["amenity"="embassy"]["country"="US"];
+      );
+      out body center;`;
 
     try {
       console.log('[EmbassyFetcher] Fetching US embassy/consulate data from OpenStreetMap...');
@@ -71,11 +90,26 @@ export class EmbassyDataFetcher {
       const tags = element.tags;
       if (!tags) continue;
 
+      // Filter to ensure this is a US embassy (not a foreign embassy)
+      // Primary check: country=US tag
+      // Secondary check: name contains "United States" or "U.S." as safeguard
+      if (tags.country && tags.country !== 'US') {
+        continue;
+      }
+      
+      // If no country tag, verify it's a US embassy by name
+      if (!tags.country && tags.name) {
+        const nameContainsUS = /united\s+states|u\.?s\.?/i.test(tags.name);
+        if (!nameContainsUS) {
+          continue;
+        }
+      }
+
       // Get coordinates (direct from node, or center from way/relation)
       const lat = element.lat ?? element.center?.lat;
       const lon = element.lon ?? element.center?.lon;
 
-      if (!lat || !lon) {
+      if (lat === undefined || lon === undefined) {
         console.warn(`[EmbassyFetcher] Skipping element ${element.id}: missing coordinates`);
         continue;
       }
@@ -90,6 +124,19 @@ export class EmbassyDataFetcher {
       // Determine type (embassy, consulate, consulate_general)
       const type = this.determineType(tags);
 
+      // Build full street address with house number (check both addr: and contact: tags)
+      const streetParts = [];
+      const houseNumber = tags['addr:housenumber'] || tags['contact:housenumber'];
+      const street = tags['addr:street'] || tags['contact:street'];
+      
+      if (houseNumber) {
+        streetParts.push(houseNumber);
+      }
+      if (street) {
+        streetParts.push(street);
+      }
+      const fullAddress = streetParts.length > 0 ? streetParts.join(' ') : null;
+
       const embassy: InsertEmbassyConsulate = {
         id: `osm-${element.type}-${element.id}`,
         countryCode: countryCode,
@@ -97,10 +144,10 @@ export class EmbassyDataFetcher {
         type: type,
         latitude: lat.toString(),
         longitude: lon.toString(),
-        streetAddress: tags['addr:street'] || null,
-        city: tags['addr:city'] || null,
+        streetAddress: fullAddress,
+        city: tags['addr:city'] || tags['contact:city'] || null,
         phone: tags['contact:phone'] || tags.phone || null,
-        website: tags.website || null,
+        website: tags['contact:website'] || tags.website || null,
       };
 
       embassies.push(embassy);
@@ -115,13 +162,20 @@ export class EmbassyDataFetcher {
   private extractCountryCode(tags: OverpassElement['tags']): string | null {
     if (!tags) return null;
 
+    // Try addr:country first
     const addrCountry = tags['addr:country'];
     if (addrCountry) {
       return addrCountry.toUpperCase();
     }
 
-    // If city is available, try to map it to a country code
-    const city = tags['addr:city'];
+    // Try target tag (indicates the country the embassy is located in)
+    const target = tags['target'];
+    if (target) {
+      return target.toUpperCase();
+    }
+
+    // Try to map city to country code (check both addr:city and contact:city)
+    const city = tags['addr:city'] || tags['contact:city'];
     if (city) {
       return this.cityToCountryCode(city);
     }
@@ -134,26 +188,101 @@ export class EmbassyDataFetcher {
    */
   private cityToCountryCode(city: string): string | null {
     const cityMap: Record<string, string> = {
+      // Western Europe
       'paris': 'FR',
       'london': 'GB',
       'berlin': 'DE',
-      'tokyo': 'JP',
-      'beijing': 'CN',
-      'moscow': 'RU',
       'rome': 'IT',
       'madrid': 'ES',
+      'amsterdam': 'NL',
+      'brussels': 'BE',
+      'vienna': 'AT',
+      'stockholm': 'SE',
+      'copenhagen': 'DK',
+      'oslo': 'NO',
+      'helsinki': 'FI',
+      'dublin': 'IE',
+      'lisbon': 'PT',
+      'athens': 'GR',
+      'bern': 'CH',
+      'luxembourg': 'LU',
+      // Eastern Europe
+      'moscow': 'RU',
+      'kyiv': 'UA',
+      'kiev': 'UA',
+      'warsaw': 'PL',
+      'prague': 'CZ',
+      'praha': 'CZ',
+      'budapest': 'HU',
+      'bucharest': 'RO',
+      'sofia': 'BG',
+      'zagreb': 'HR',
+      'belgrade': 'RS',
+      // Asia
+      'tokyo': 'JP',
+      'beijing': 'CN',
+      'seoul': 'KR',
+      'new delhi': 'IN',
+      'delhi': 'IN',
+      'bangkok': 'TH',
+      'jakarta': 'ID',
+      'manila': 'PH',
+      'singapore': 'SG',
+      'kuala lumpur': 'MY',
+      'hanoi': 'VN',
+      'islamabad': 'PK',
+      'kabul': 'AF',
+      'dhaka': 'BD',
+      'colombo': 'LK',
+      // Middle East
+      'ankara': 'TR',
+      'istanbul': 'TR',
+      'riyadh': 'SA',
+      'abu dhabi': 'AE',
+      'dubai': 'AE',
+      'doha': 'QA',
+      'kuwait city': 'KW',
+      'manama': 'BH',
+      'muscat': 'OM',
+      'sanaa': 'YE',
+      'baghdad': 'IQ',
+      'damascus': 'SY',
+      'beirut': 'LB',
+      'amman': 'JO',
+      'jerusalem': 'IL',
+      'tel aviv': 'IL',
+      'cairo': 'EG',
+      // Africa
+      'nairobi': 'KE',
+      'addis ababa': 'ET',
+      'accra': 'GH',
+      'abuja': 'NG',
+      'lagos': 'NG',
+      'dakar': 'SN',
+      'pretoria': 'ZA',
+      'johannesburg': 'ZA',
+      'cape town': 'ZA',
+      'algiers': 'DZ',
+      'tunis': 'TN',
+      'rabat': 'MA',
+      'casablanca': 'MA',
+      // Americas
       'ottawa': 'CA',
       'mexico city': 'MX',
       'brasilia': 'BR',
-      'new delhi': 'IN',
+      'buenos aires': 'AR',
+      'santiago': 'CL',
+      'bogota': 'CO',
+      'lima': 'PE',
+      'caracas': 'VE',
+      'quito': 'EC',
+      'la paz': 'BO',
+      'asuncion': 'PY',
+      'montevideo': 'UY',
+      // Oceania
       'canberra': 'AU',
-      'seoul': 'KR',
-      'ankara': 'TR',
-      'cairo': 'EG',
-      'nairobi': 'KE',
-      'tel aviv': 'IL',
-      'riyadh': 'SA',
-      'abu dhabi': 'AE',
+      'sydney': 'AU',
+      'wellington': 'NZ',
     };
 
     const normalizedCity = city.toLowerCase().trim();
