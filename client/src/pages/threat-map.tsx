@@ -1,8 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup } from "react-leaflet";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, Globe, Building2 } from "lucide-react";
+import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, Globe, Building2, Download } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { GeoJsonObject } from "geojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -125,6 +128,7 @@ const createEmbassyIcon = () => {
 export default function ThreatMap() {
   const [geoData, setGeoData] = useState<GeoJsonObject | null>(null);
   const [loadingGeo, setLoadingGeo] = useState(true);
+  const { toast } = useToast();
 
   const { data: threatData, isLoading: isLoadingThreat } = useQuery<ThreatMapData>({
     queryKey: ["/api/countries"],
@@ -132,6 +136,28 @@ export default function ThreatMap() {
 
   const { data: embassyData } = useQuery<EmbassyResponse>({
     queryKey: ["/api/embassies"],
+  });
+
+  const embassyRefreshMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('/api/embassies/refresh', {
+        method: 'POST',
+      }) as { message: string; count: number };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/embassies"] });
+      toast({
+        title: "Embassy data updated",
+        description: `Successfully downloaded ${data.count} US embassies worldwide`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Download failed",
+        description: error.message || "Failed to download embassy data",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -351,6 +377,35 @@ export default function ThreatMap() {
               <AlertCircle className="w-4 h-4 text-gray-500" />
               <span>No Data</span>
             </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium">US Embassies</span>
+              </div>
+              <span className="text-xs text-muted-foreground">{embassyData?.count || 0}</span>
+            </div>
+            <Button
+              onClick={() => embassyRefreshMutation.mutate()}
+              disabled={embassyRefreshMutation.isPending}
+              size="sm"
+              className="w-full"
+              data-testid="button-refresh-embassies"
+            >
+              {embassyRefreshMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Sync Embassy Data
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
