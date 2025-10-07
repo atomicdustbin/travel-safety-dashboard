@@ -261,58 +261,66 @@ export default function ThreatMap() {
               onEachFeature={onEachCountry}
             />
           )}
-          {embassyData?.embassies.map((embassy) => (
-            <Marker
-              key={embassy.id}
-              position={[embassy.latitude, embassy.longitude]}
-              icon={createEmbassyIcon()}
-            >
-              <Popup>
-                <div className="p-2 min-w-[220px]" data-testid={`embassy-popup-${embassy.id}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-bold text-base">{embassy.name}</h3>
+          {embassyData?.embassies.map((embassy) => {
+            // Get country name from code
+            const countryData = Array.from(threatMap.values()).find(
+              (c) => c.country.code === embassy.countryCode
+            );
+            const countryName = countryData?.country.name || embassy.countryCode;
+            
+            return (
+              <Marker
+                key={embassy.id}
+                position={[embassy.latitude, embassy.longitude]}
+                icon={createEmbassyIcon()}
+              >
+                <Popup>
+                  <div className="p-2 min-w-[220px]" data-testid={`embassy-popup-${embassy.id}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Building2 className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-bold text-base">{embassy.name}</h3>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <p className="text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">Type:</span> {embassy.type}
+                      </p>
+                      {(embassy.streetAddress || embassy.city) && (
+                        <div className="text-gray-600 dark:text-gray-300">
+                          <span className="font-medium">Address:</span>
+                          <div className="ml-0 mt-1">
+                            {embassy.streetAddress && <div>{embassy.streetAddress}</div>}
+                            {embassy.city && <div>{embassy.city}</div>}
+                            <div className="capitalize">{countryName}</div>
+                          </div>
+                        </div>
+                      )}
+                      {embassy.phone && (
+                        <p className="text-gray-600 dark:text-gray-300">
+                          <span className="font-medium">Phone:</span>{" "}
+                          <a href={`tel:${embassy.phone}`} className="text-blue-600 hover:underline">
+                            {embassy.phone}
+                          </a>
+                        </p>
+                      )}
+                      {embassy.website && (
+                        <p className="text-gray-600 dark:text-gray-300">
+                          <span className="font-medium">Website:</span>{" "}
+                          <a 
+                            href={embassy.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Visit
+                          </a>
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Type:</span> {embassy.type}
-                    </p>
-                    {embassy.streetAddress && (
-                      <p className="text-gray-600 dark:text-gray-300">
-                        <span className="font-medium">Address:</span> {embassy.streetAddress}
-                      </p>
-                    )}
-                    {embassy.city && (
-                      <p className="text-gray-600 dark:text-gray-300">
-                        <span className="font-medium">City:</span> {embassy.city}
-                      </p>
-                    )}
-                    {embassy.phone && (
-                      <p className="text-gray-600 dark:text-gray-300">
-                        <span className="font-medium">Phone:</span>{" "}
-                        <a href={`tel:${embassy.phone}`} className="text-blue-600 hover:underline">
-                          {embassy.phone}
-                        </a>
-                      </p>
-                    )}
-                    {embassy.website && (
-                      <p className="text-gray-600 dark:text-gray-300">
-                        <span className="font-medium">Website:</span>{" "}
-                        <a 
-                          href={embassy.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          Visit
-                        </a>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
 
         <div className="absolute top-4 right-4 bg-card border shadow-lg rounded-lg p-4 max-w-xs z-[1000]" data-testid="map-legend">
