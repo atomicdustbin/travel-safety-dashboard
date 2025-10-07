@@ -65,6 +65,20 @@ export const jobCountryProgress = pgTable("job_country_progress", {
   retryCount: integer("retry_count").notNull().default(0),
 });
 
+export const embassiesConsulates = pgTable("embassies_consulates", {
+  id: varchar("id").primaryKey(),
+  countryCode: text("country_code").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'embassy', 'consulate', 'consulate_general'
+  latitude: text("latitude").notNull(),
+  longitude: text("longitude").notNull(),
+  streetAddress: text("street_address"),
+  city: text("city"),
+  phone: text("phone"),
+  website: text("website"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
 // Insert schemas
 export const insertCountrySchema = createInsertSchema(countries).omit({
   lastUpdated: true,
@@ -86,17 +100,23 @@ export const insertJobCountryProgressSchema = createInsertSchema(jobCountryProgr
   id: true,
 });
 
+export const insertEmbassyConsulateSchema = createInsertSchema(embassiesConsulates).omit({
+  lastUpdated: true,
+});
+
 // Types
 export type Country = typeof countries.$inferSelect;
 export type Alert = typeof alerts.$inferSelect;
 export type BackgroundInfo = typeof backgroundInfo.$inferSelect;
 export type BulkJob = typeof bulkJobs.$inferSelect;
 export type JobCountryProgress = typeof jobCountryProgress.$inferSelect;
+export type EmbassyConsulate = typeof embassiesConsulates.$inferSelect;
 export type InsertCountry = z.infer<typeof insertCountrySchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type InsertBackgroundInfo = z.infer<typeof insertBackgroundInfoSchema>;
 export type InsertBulkJob = z.infer<typeof insertBulkJobSchema>;
 export type InsertJobCountryProgress = z.infer<typeof insertJobCountryProgressSchema>;
+export type InsertEmbassyConsulate = z.infer<typeof insertEmbassyConsulateSchema>;
 
 // Combined types for API responses
 export type CountryData = {
