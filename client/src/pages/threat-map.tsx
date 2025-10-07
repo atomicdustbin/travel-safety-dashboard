@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { MapContainer, TileLayer, GeoJSON, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup } from "react-leaflet";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, Globe } from "lucide-react";
+import { Loader2, AlertTriangle, Shield, AlertCircle, Ban, Globe, Building2 } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import type { GeoJsonObject } from "geojson";
 import L from "leaflet";
@@ -21,6 +21,24 @@ interface CountryData {
 
 interface ThreatMapData {
   countries: CountryData[];
+}
+
+interface Embassy {
+  id: string;
+  countryCode: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  streetAddress?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  website?: string | null;
+}
+
+interface EmbassyResponse {
+  embassies: Embassy[];
+  count: number;
 }
 
 const getThreatColor = (level: number | null): string => {
@@ -71,12 +89,49 @@ const getThreatIcon = (level: number | null) => {
   }
 };
 
+// Create custom embassy icon
+const createEmbassyIcon = () => {
+  return L.divIcon({
+    html: `
+      <div style="
+        background-color: #1e40af;
+        border: 2px solid white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path>
+          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path>
+          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"></path>
+          <path d="M10 6h4"></path>
+          <path d="M10 10h4"></path>
+          <path d="M10 14h4"></path>
+          <path d="M10 18h4"></path>
+        </svg>
+      </div>
+    `,
+    className: 'embassy-marker',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12],
+  });
+};
+
 export default function ThreatMap() {
   const [geoData, setGeoData] = useState<GeoJsonObject | null>(null);
   const [loadingGeo, setLoadingGeo] = useState(true);
 
   const { data: threatData, isLoading: isLoadingThreat } = useQuery<ThreatMapData>({
     queryKey: ["/api/countries"],
+  });
+
+  const { data: embassyData } = useQuery<EmbassyResponse>({
+    queryKey: ["/api/embassies"],
   });
 
   useEffect(() => {
@@ -206,6 +261,58 @@ export default function ThreatMap() {
               onEachFeature={onEachCountry}
             />
           )}
+          {embassyData?.embassies.map((embassy) => (
+            <Marker
+              key={embassy.id}
+              position={[embassy.latitude, embassy.longitude]}
+              icon={createEmbassyIcon()}
+            >
+              <Popup>
+                <div className="p-2 min-w-[220px]" data-testid={`embassy-popup-${embassy.id}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-bold text-base">{embassy.name}</h3>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Type:</span> {embassy.type}
+                    </p>
+                    {embassy.streetAddress && (
+                      <p className="text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">Address:</span> {embassy.streetAddress}
+                      </p>
+                    )}
+                    {embassy.city && (
+                      <p className="text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">City:</span> {embassy.city}
+                      </p>
+                    )}
+                    {embassy.phone && (
+                      <p className="text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">Phone:</span>{" "}
+                        <a href={`tel:${embassy.phone}`} className="text-blue-600 hover:underline">
+                          {embassy.phone}
+                        </a>
+                      </p>
+                    )}
+                    {embassy.website && (
+                      <p className="text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">Website:</span>{" "}
+                        <a 
+                          href={embassy.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Visit
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
 
         <div className="absolute top-4 right-4 bg-card border shadow-lg rounded-lg p-4 max-w-xs z-[1000]" data-testid="map-legend">
