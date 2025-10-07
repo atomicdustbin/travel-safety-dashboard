@@ -1,11 +1,13 @@
 import { dataFetcher } from "./dataFetcher";
 import { bulkDownloadService } from "./bulkDownloadService";
+import { embassyDataFetcher } from "./embassyFetcher";
 import { storage } from "../storage";
 
 class DataScheduler {
   private alertRefreshInterval: NodeJS.Timeout | null = null;
   private backgroundRefreshInterval: NodeJS.Timeout | null = null;
   private weeklyBulkDownloadInterval: NodeJS.Timeout | null = null;
+  private monthlyEmbassyRefreshInterval: NodeJS.Timeout | null = null;
   private recentCountries: Set<string> = new Set();
 
   startScheduler(): void {
@@ -24,10 +26,16 @@ class DataScheduler {
       this.checkAndRunWeeklyBulkDownload();
     }, 60 * 60 * 1000); // Check every hour
 
-    console.log("Data scheduler started - alerts: 6h, background: 7d, bulk download: weekly");
+    // Monthly embassy refresh - check every hour if it's 1st of month at 2 AM
+    this.monthlyEmbassyRefreshInterval = setInterval(() => {
+      this.checkAndRunMonthlyEmbassyRefresh();
+    }, 60 * 60 * 1000); // Check every hour
+
+    console.log("Data scheduler started - alerts: 6h, background: 7d, bulk download: weekly, embassy: monthly");
     
-    // Run initial check for weekly bulk download in case we just started on Sunday at 1 AM
+    // Run initial checks in case we just started at the scheduled time
     this.checkAndRunWeeklyBulkDownload();
+    this.checkAndRunMonthlyEmbassyRefresh();
   }
 
   stopScheduler(): void {
@@ -42,6 +50,10 @@ class DataScheduler {
     if (this.weeklyBulkDownloadInterval) {
       clearInterval(this.weeklyBulkDownloadInterval);
       this.weeklyBulkDownloadInterval = null;
+    }
+    if (this.monthlyEmbassyRefreshInterval) {
+      clearInterval(this.monthlyEmbassyRefreshInterval);
+      this.monthlyEmbassyRefreshInterval = null;
     }
     console.log("Data scheduler stopped");
   }
@@ -130,6 +142,53 @@ class DataScheduler {
       console.log(`[Scheduler] Started weekly bulk download job: ${jobId}`);
     } catch (error) {
       console.error("[Scheduler] Failed to start weekly bulk download:", error);
+      throw error;
+    }
+  }
+
+  private lastEmbassyRefreshDate: string | null = null; // Track last run date to prevent duplicates
+
+  /**
+   * Check if it's the 1st of the month at 2 AM and run embassy refresh if it is
+   */
+  private checkAndRunMonthlyEmbassyRefresh(): void {
+    const now = new Date();
+    const day = now.getDate(); // 1-31
+    const hour = now.getHours();
+    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // Run if it's the 1st of the month (day 1) and hour is 2 (2 AM) and we haven't run today
+    if (day === 1 && hour === 2 && this.lastEmbassyRefreshDate !== dateKey) {
+      console.log("[Scheduler] Running monthly embassy refresh on 1st of month at 2 AM");
+      this.lastEmbassyRefreshDate = dateKey; // Mark as run for this date
+      
+      this.runMonthlyEmbassyRefresh().catch(error => {
+        console.error("[Scheduler] Monthly embassy refresh failed:", error);
+        // Reset the date key on failure so it can retry later
+        this.lastEmbassyRefreshDate = null;
+      });
+    }
+  }
+
+  /**
+   * Run the monthly refresh of US embassy/consulate data
+   */
+  private async runMonthlyEmbassyRefresh(): Promise<void> {
+    try {
+      console.log("[Scheduler] Fetching all US embassy data from OpenStreetMap...");
+      const embassies = await embassyDataFetcher.fetchAllUSEmbassies();
+      
+      if (embassies.length === 0) {
+        console.warn("[Scheduler] No embassy data found");
+        return;
+      }
+
+      // Clear existing data and save new data
+      await storage.deleteAllEmbassies();
+      await storage.bulkCreateEmbassies(embassies);
+      console.log(`[Scheduler] ✅ Successfully refreshed ${embassies.length} US embassies worldwide`);
+    } catch (error) {
+      console.error("[Scheduler] Failed to refresh embassy data:", error);
       throw error;
     }
   }
