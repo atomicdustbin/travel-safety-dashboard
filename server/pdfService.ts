@@ -109,7 +109,7 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
   // Removed getSeverityBadgeColor function - using clean styling without background colors
 
   const countriesHTML = searchResults.map(countryData => {
-    const { country, alerts, background } = countryData;
+    const { country, alerts, background, embassies } = countryData;
     const threatLevel = getStateDeptThreatLevel(alerts);
     const threatColor = getThreatLevelColor(threatLevel);
 
@@ -285,6 +285,48 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
             <div class="no-data">Background information not available</div>
           `}
         </div>
+
+        ${embassies && embassies.length > 0 ? `
+          <div class="section">
+            <h3 class="section-title">
+              <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/>
+                <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+                <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>
+                <path d="M10 6h4"/>
+                <path d="M10 10h4"/>
+                <path d="M10 14h4"/>
+                <path d="M10 18h4"/>
+              </svg>
+              US Embassy & Consulates
+            </h3>
+            <div class="embassies-container">
+              ${embassies.map(embassy => `
+                <div class="embassy-item">
+                  <div class="embassy-header">
+                    <h5 class="embassy-name">${escapeHtml(embassy.name)}</h5>
+                    <span class="embassy-type-badge">${escapeHtml(embassy.type.replace('_', ' ').charAt(0).toUpperCase() + embassy.type.replace('_', ' ').slice(1))}</span>
+                  </div>
+                  ${embassy.streetAddress && embassy.city ? `
+                    <div class="embassy-detail">
+                      <strong>Address:</strong> ${escapeHtml(embassy.streetAddress)}, ${escapeHtml(embassy.city)}
+                    </div>
+                  ` : ''}
+                  ${embassy.phone ? `
+                    <div class="embassy-detail">
+                      <strong>Phone:</strong> ${escapeHtml(embassy.phone)}
+                    </div>
+                  ` : ''}
+                  ${embassy.website ? `
+                    <div class="embassy-detail">
+                      <strong>Website:</strong> <a href="${escapeHtml(embassy.website)}">${escapeHtml(embassy.website)}</a>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -596,6 +638,67 @@ function generateHTMLTemplate(searchResults: SearchResult, searchQuery: string):
         
         .ai-list li:last-child {
           margin-bottom: 0;
+        }
+        
+        /* Embassy Section Styles */
+        .embassies-container {
+          /* Spacing handled by margin-bottom on .embassy-item */
+        }
+        
+        .embassy-item {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 15px;
+          margin-bottom: 15px;
+          background: white;
+        }
+        
+        .embassy-item:last-child {
+          margin-bottom: 0;
+        }
+        
+        .embassy-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        }
+        
+        .embassy-name {
+          font-weight: bold;
+          color: #1f2937;
+          font-size: 14px;
+        }
+        
+        .embassy-type-badge {
+          color: #374151;
+          padding: 4px 8px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 500;
+          background: white;
+          text-transform: capitalize;
+        }
+        
+        .embassy-detail {
+          color: #4b5563;
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+        
+        .embassy-detail:last-child {
+          margin-bottom: 0;
+        }
+        
+        .embassy-detail strong {
+          color: #1f2937;
+          font-weight: 600;
+        }
+        
+        .embassy-detail a {
+          color: #2563eb;
+          text-decoration: none;
         }
       </style>
     </head>

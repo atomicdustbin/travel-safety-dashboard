@@ -123,6 +123,7 @@ export type CountryData = {
   country: Country;
   alerts: Alert[];
   background: BackgroundInfo | null;
+  embassies: EmbassyConsulate[];
 };
 
 export type SearchResult = CountryData[];

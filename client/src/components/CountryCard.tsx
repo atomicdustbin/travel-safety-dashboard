@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, FileText, ExternalLink, Globe, Brain, Shield, MapPin } from "lucide-react";
+import { AlertTriangle, FileText, ExternalLink, Globe, Brain, Shield, MapPin, Building2, Phone } from "lucide-react";
 import { type CountryData } from "@shared/schema";
 import { useState } from "react";
 
@@ -9,7 +9,7 @@ interface CountryCardProps {
 }
 
 export function CountryCard({ countryData }: CountryCardProps) {
-  const { country, alerts, background } = countryData;
+  const { country, alerts, background, embassies } = countryData;
   const [flagError, setFlagError] = useState(false);
 
   // Find US State Department alert and extract threat level
@@ -290,6 +290,65 @@ export function CountryCard({ countryData }: CountryCardProps) {
             </div>
           )}
         </div>
+
+        {/* US Embassy & Consulate Information */}
+        {embassies && embassies.length > 0 && (
+          <div className="border-t border-border pt-4 mt-4">
+            <h4 className="text-lg font-medium text-foreground mb-3 flex items-center">
+              <Building2 className="w-5 h-5 mr-2 text-primary" />
+              US Embassy & Consulates
+            </h4>
+            <div className="space-y-3">
+              {embassies.map((embassy, index) => (
+                <div
+                  key={embassy.id}
+                  className="border border-gray-200 rounded-lg p-3"
+                  data-testid={`embassy-${country.id}-${index}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h5 className="text-sm font-semibold text-foreground" data-testid={`text-embassy-name-${country.id}-${index}`}>
+                      {embassy.name}
+                    </h5>
+                    <Badge className="border border-gray-300 text-foreground bg-background capitalize" data-testid={`badge-embassy-type-${country.id}-${index}`}>
+                      {embassy.type.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  
+                  {embassy.streetAddress && embassy.city && (
+                    <div className="flex items-start text-sm text-muted-foreground mb-2">
+                      <MapPin className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0" />
+                      <span data-testid={`text-embassy-address-${country.id}-${index}`}>
+                        {embassy.streetAddress}, {embassy.city}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {embassy.phone && (
+                    <div className="flex items-center text-sm text-muted-foreground mb-2">
+                      <Phone className="w-4 h-4 mr-1" />
+                      <a href={`tel:${embassy.phone}`} className="hover:text-primary" data-testid={`link-embassy-phone-${country.id}-${index}`}>
+                        {embassy.phone}
+                      </a>
+                    </div>
+                  )}
+                  
+                  {embassy.website && (
+                    <a
+                      href={embassy.website}
+                      className="text-sm text-primary hover:text-primary/80 font-medium inline-flex items-center"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`link-embassy-website-${country.id}-${index}`}
+                    >
+                      Visit website
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

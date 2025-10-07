@@ -177,11 +177,13 @@ export class MemStorage implements IStorage {
 
     const alerts = await this.getAlertsByCountryId(country.id);
     const background = await this.getBackgroundInfoByCountryId(country.id);
+    const embassies = await this.getEmbassiesByCountryCode(country.code);
 
     return {
       country,
       alerts,
       background: background || null,
+      embassies,
     };
   }
 
@@ -204,6 +206,7 @@ export class MemStorage implements IStorage {
     for (const country of Array.from(this.countries.values())) {
       const alerts = await this.getAlertsByCountryId(country.id);
       const background = await this.getBackgroundInfoByCountryId(country.id);
+      const embassies = await this.getEmbassiesByCountryCode(country.code);
       
       // Only include countries that have alerts (meaning they have cached data)
       if (alerts.length > 0) {
@@ -211,6 +214,7 @@ export class MemStorage implements IStorage {
           country,
           alerts,
           background: background || null,
+          embassies,
         });
       }
     }
@@ -448,15 +452,17 @@ export class DBStorage implements IStorage {
     const country = await this.getCountryByName(countryName);
     if (!country) return undefined;
 
-    const [countryAlerts, background] = await Promise.all([
+    const [countryAlerts, background, embassies] = await Promise.all([
       this.getAlertsByCountryId(country.id),
       this.getBackgroundInfoByCountryId(country.id),
+      this.getEmbassiesByCountryCode(country.code),
     ]);
 
     return {
       country,
       alerts: countryAlerts,
       background: background || null,
+      embassies,
     };
   }
 
@@ -468,15 +474,17 @@ export class DBStorage implements IStorage {
 
     const results: CountryData[] = [];
     for (const country of countriesResults) {
-      const [countryAlerts, background] = await Promise.all([
+      const [countryAlerts, background, embassies] = await Promise.all([
         this.getAlertsByCountryId(country.id),
         this.getBackgroundInfoByCountryId(country.id),
+        this.getEmbassiesByCountryCode(country.code),
       ]);
 
       results.push({
         country,
         alerts: countryAlerts,
         background: background || null,
+        embassies,
       });
     }
 
@@ -488,15 +496,17 @@ export class DBStorage implements IStorage {
     const results: CountryData[] = [];
 
     for (const country of allCountries) {
-      const [countryAlerts, background] = await Promise.all([
+      const [countryAlerts, background, embassies] = await Promise.all([
         this.getAlertsByCountryId(country.id),
         this.getBackgroundInfoByCountryId(country.id),
+        this.getEmbassiesByCountryCode(country.code),
       ]);
 
       results.push({
         country,
         alerts: countryAlerts,
         background: background || null,
+        embassies,
       });
     }
 
